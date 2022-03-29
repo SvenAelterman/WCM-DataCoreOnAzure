@@ -7,16 +7,16 @@
 [CmdletBinding()]
 Param(
 	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus',
+	[string]$Location = 'eastus2',
 	# The environment descriptor
 	[ValidateSet('test', 'demo', 'prod')]
-	[string]$Environment = 'test',
+	[string]$Environment = 'demo',
 	#
 	[Parameter(Mandatory = $true)]
-	[string]$WorkloadName,
+	[string]$WorkloadName = 'researchhub',
 	#
 	[int]$Sequence = 1,
-	[string]$NamingConvention = "{rtype}-$WorkloadName-{env}-{loc}-{seq}"
+	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}"
 )
 
 $TemplateParameters = @{
@@ -31,9 +31,13 @@ $TemplateParameters = @{
 	tags             = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
-		lifetime       = 'short'
+		lifetime       = 'medium'
+		'customer-ref' = 'WCM'
 	}
 }
+
+# Sven's research hub sub
+Select-AzSubscription 2715e6dd-7a1f-406c-9d9f-06122817408f
 
 $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
 	-TemplateFile ".\main.bicep" -TemplateParameterObject $TemplateParameters

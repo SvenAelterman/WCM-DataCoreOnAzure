@@ -13,41 +13,67 @@ param location string
 param environment string
 param workloadName string
 
+param vnetAddressSpace string = '10.19.0.0/16'
+param subnetAddressSpace string = '10.19.0.0/24'
+
 // Optional parameters
 param tags object = {}
 param sequence int = 1
-param namingConvention string = '{rtype}-{wloadname}-{env}-{loc}-{seq}'
+param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param deploymentTime string = utcNow()
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
+var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
 // Naming structure only needs the resource type ({rtype}) replaced
 var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', environment), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
+var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
 
-resource hubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: replace(namingStructure, '{rtype}', 'rg-hub')
+resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: replace(coreNamingStructure, '{rtype}', 'rg')
+  location: location
+  tags: tags
+}
+
+resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: replace(avdNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
 
 module roles 'common-modules/roles.bicep' = {
-  name: '${workloadName}-roles-${deploymentTime}'
-  scope: hubResourceGroup
+  name: replace(deploymentNameStructure, '{rtype}', 'roles')
+  scope: coreHubResourceGroup
 }
 
 module abbreviations 'common-modules/abbreviations.bicep' = {
-  name: '${workloadName}-abbrev-${deploymentTime}'
-  scope: hubResourceGroup
+  name: replace(deploymentNameStructure, '{rtype}', 'abbrev')
+  scope: coreHubResourceGroup
 }
 
+var vnetAbbrev = abbreviations.outputs.abbreviations['Virtual Network']
 // Add deployments here
 
 module hubVnetModule 'modules/vnet.bicep' = {
-  name: '$'
-  scope: hubResourceGroup
+  name: replace(deploymentNameStructure, '{rtype}', 'vnet-hub-core')
+  scope: coreHubResourceGroup
   params: {
-    vnetName: replace(namingConvention, '{rtype}', 'vnet')
+    vnetName: replace(coreNamingStructure, '{rtype}', vnetAbbrev)
+    location: location
+    addressPrefix: vnetAddressSpace
+    subnetAddressPrefix: subnetAddressSpace
+    tags: tags
+  }
+}
+
+module hubAvdModule 'modules/avd.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'avd')
+  scope: avdHubResourceGroup
+  params: {
+    namingStructure: avdNamingStructure
+    tags: tags
   }
 }
 

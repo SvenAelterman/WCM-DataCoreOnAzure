@@ -5,6 +5,8 @@ var abbreviations = {
   'AVD Host Pool': 'hp'
   'AVD Workspace': 'ws'
   'AVD App Group': 'ag'
+  'Availability Set': 'avail'
+  'Azure Virtual Desktop': 'avd'
 }
 
 output abbreviations object = abbreviations

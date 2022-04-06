@@ -9,10 +9,10 @@ Param(
 	[ValidateSet('eastus2', 'eastus')]
 	[string]$Location = 'eastus2',
 	# The environment descriptor
-	[ValidateSet('test', 'demo', 'prod')]
-	[string]$Environment = 'demo',
+	[ValidateSet('Test', 'Demo', 'Prod')]
+	[string]$Environment = 'Demo',
 	#
-	[Parameter(Mandatory = $true)]
+	[Parameter()]
 	[string]$WorkloadName = 'researchhub',
 	#
 	[int]$Sequence = 1,
@@ -45,4 +45,6 @@ $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$E
 $DeploymentResult
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
+	# AFTER ACTIONS
+	# - Assign access to AVD application group + Virtual Machine User Login
 }

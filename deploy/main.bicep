@@ -6,28 +6,29 @@ targetScope = 'subscription'
 ])
 param location string
 @allowed([
-  'test'
-  'demo'
-  'prod'
+  'Test'
+  'Demo'
+  'Prod'
 ])
 param environment string
 param workloadName string
 
 param vnetAddressSpace string = '10.19.0.0/16'
-param subnetAddressSpace string = '10.19.0.0/24'
+param subnetAddressSpace string = '10.19.{octet3}.0/24'
 
 // Optional parameters
 param tags object = {}
 param sequence int = 1
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param deploymentTime string = utcNow()
+param avdVmHostNameStructure string = 'vm-avd'
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
 // Naming structure only needs the resource type ({rtype}) replaced
-var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', environment), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
 
@@ -48,13 +49,12 @@ module roles 'common-modules/roles.bicep' = {
   scope: coreHubResourceGroup
 }
 
-module abbreviations 'common-modules/abbreviations.bicep' = {
+module abbreviationsModule 'common-modules/abbreviations.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'abbrev')
   scope: coreHubResourceGroup
 }
 
-var vnetAbbrev = abbreviations.outputs.abbreviations['Virtual Network']
-// Add deployments here
+var vnetAbbrev = abbreviationsModule.outputs.abbreviations['Virtual Network']
 
 module hubVnetModule 'modules/vnet.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'vnet-hub-core')
@@ -68,13 +68,30 @@ module hubVnetModule 'modules/vnet.bicep' = {
   }
 }
 
-module hubAvdModule 'modules/avd.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'avd')
-  scope: avdHubResourceGroup
+module logModule 'modules/log.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'log')
+  scope: coreHubResourceGroup
   params: {
-    namingStructure: avdNamingStructure
-    tags: tags
+    location: location
+    namingStructure: coreNamingStructure
+    abbreviations: abbreviationsModule.outputs.abbreviations
   }
 }
 
-output namingStructure string = namingStructure
+module hubAvdModule 'modules/avd.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'avd')
+  dependsOn: [
+    hubVnetModule
+  ]
+  scope: avdHubResourceGroup
+  params: {
+    namingStructure: namingStructure
+    location: location
+    tags: tags
+    abbreviations: abbreviationsModule.outputs.abbreviations
+    deploymentNameStructure: deploymentNameStructure
+    avdVmHostNameStructure: avdVmHostNameStructure
+    avdSubnetId: hubVnetModule.outputs.avdSubnetId
+    environment: environment
+  }
+}

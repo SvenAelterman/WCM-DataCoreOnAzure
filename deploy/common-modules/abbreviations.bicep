@@ -7,6 +7,7 @@ var abbreviations = {
   'AVD App Group': 'ag'
   'Availability Set': 'avail'
   'Azure Virtual Desktop': 'avd'
+  'Azure Compute Gallery': 'gal'
 }
 
 output abbreviations object = abbreviations

@@ -95,3 +95,14 @@ module hubAvdModule 'modules/avd.bicep' = {
     environment: environment
   }
 }
+
+module computeGalleryModule 'modules/gal.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'gal')
+  scope: coreHubResourceGroup
+  params: {
+    location: location
+    namingStructure: coreNamingStructure
+    abbreviations: abbreviationsModule.outputs.abbreviations
+    tags: tags
+  }
+}

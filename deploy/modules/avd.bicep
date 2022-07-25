@@ -81,3 +81,5 @@ module avdVM 'avd-vmRG.bicep' = {
     avdSubnetId: avdSubnetId
   }
 }
+
+// TODO: Create ASG for hosts

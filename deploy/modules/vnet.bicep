@@ -8,8 +8,7 @@ param enableDdosProtection bool = false
 param tags object = {}
 param enableNetworkWatcher bool = false
 
-// Define the subnets needed
-var subnets = [
+param subnets array = [
   {
     name: 'default'
     addressPrefix: replace(subnetAddressPrefix, '{octet3}', '0')
@@ -51,4 +50,8 @@ module networkWatcher 'networkWatcherRG.bicep' = if (enableNetworkWatcher) {
 }
 
 // Output the resource ID of the AVD subnet to use later
+// TODO: Remove this in favor of the array
 output avdSubnetId string = vnet.properties.subnets[1].id
+output vNetId string = vnet.id
+output subnetIds array = [for (subnet, i) in subnets: vnet.properties.subnets[i].id]
+output vNetName string = vnet.name

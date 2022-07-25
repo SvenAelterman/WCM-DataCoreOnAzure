@@ -13,22 +13,24 @@ Param(
 	[string]$Environment = 'Demo',
 	#
 	[Parameter()]
-	[string]$WorkloadName = 'researchhub',
+	[string]$WorkloadName = 'researchprj',
 	#
 	[int]$Sequence = 1,
-	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}"
+	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}"
 )
 
 $TemplateParameters = @{
 	# REQUIRED
-	location         = $Location
-	environment      = $Environment
-	workloadName     = $WorkloadName
+	location          = $Location
+	environment       = $Environment
+	workloadName      = $WorkloadName
 
 	# OPTIONAL
-	sequence         = $Sequence
-	namingConvention = $NamingConvention
-	tags             = @{
+	hubSubscriptionId = '2715e6dd-7a1f-406c-9d9f-06122817408f'
+	hubWorkloadName   = 'researchhub'
+	sequence          = $Sequence
+	namingConvention  = $NamingConvention
+	tags              = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
 		lifetime       = 'medium'
@@ -36,17 +38,15 @@ $TemplateParameters = @{
 	}
 }
 
-# Sven's research hub sub (3)
-Select-AzSubscription 2715e6dd-7a1f-406c-9d9f-06122817408f
+# Sven's research project sub (5)
+Select-AzSubscription 1097603d-3720-4053-9380-a61b085faf5d
 
 $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
-	-TemplateFile ".\main-hub.bicep" -TemplateParameterObject $TemplateParameters
+	-TemplateFile ".\main-prj.bicep" -TemplateParameterObject $TemplateParameters
 
 $DeploymentResult
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
-	# AFTER ACTIONS
-	# - Assign access to AVD application group + Virtual Machine User Login
 }
 
-# TODO: NSGs
+# TODO: Project templates: peering, NSGs

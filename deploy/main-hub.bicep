@@ -44,7 +44,7 @@ resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   tags: tags
 }
 
-module roles 'common-modules/roles.bicep' = {
+module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
   scope: coreHubResourceGroup
 }

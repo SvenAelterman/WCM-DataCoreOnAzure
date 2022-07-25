@@ -129,3 +129,5 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
     }
   }
 }
+
+// TODO: Join hosts to ASG

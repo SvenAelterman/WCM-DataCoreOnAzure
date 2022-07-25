@@ -8,7 +8,7 @@ resource logAnalyticsWS 'Microsoft.OperationalInsights/workspaces@2021-12-01-pre
 }
 
 // Enable a delete lock on this critical resource
-resource lock 'Microsoft.Authorization/locks@2020-05-01' = {
+resource lock 'Microsoft.Authorization/locks@2017-04-01' = {
   name: '${logAnalyticsWS.name}-lck'
   scope: logAnalyticsWS
   properties: {

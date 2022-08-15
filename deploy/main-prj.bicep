@@ -13,8 +13,11 @@ param location string
 param environment string
 param workloadName string
 
-param vnetAddressSpace string = '10.20.0.0/16'
-param subnetAddressSpace string = '10.20.{octet3}.0/24'
+param vnetOctet2Base int = 20
+param vnetOctet2 int = vnetOctet2Base + sequence - 1
+
+param vnetAddressSpace string = '10.${vnetOctet2}.0.0/16'
+param subnetAddressSpace string = '10.${vnetOctet2}.{octet3}.0/24'
 
 param hubSubscriptionId string
 param hubWorkloadName string
@@ -22,6 +25,7 @@ param hubWorkloadName string
 // Optional parameters
 param tags object = {}
 param sequence int = 1
+param hubSequence int = 1
 // NOTE: Must be the same as the hub naming convention
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param deploymentTime string = utcNow()
@@ -31,31 +35,22 @@ var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
 // Naming structure only needs the resource type ({rtype}) replaced
-var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
-var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
-var dataNamingStructure = replace(namingStructure, '{subwloadname}', 'data')
-var computeNamingStructure = replace(namingStructure, '{subwloadname}', 'compute')
+var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', 'c')
+var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'core')
+var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'data')
+var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'compute')
 
 // Names of hub resources
-var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
+var hubSequenceFormatted = format('{0:00}', hubSequence)
+var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
 var hubVNetName = replace(hubCoreNamingStructure, '{rtype}', 'vnet')
 
 var containerNames = {
-  'exportApprovedContainerName': 'export-approved'
-  'ingestContainerName': 'ingest'
-  'exportPendingContainerName': 'export-pending'
+  exportApprovedContainerName: 'export-approved'
+  ingestContainerName: 'ingest'
+  exportPendingContainerName: 'export-pending'
 }
-
-var subnets = [
-  {
-    name: 'default'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
-  }
-  {
-    name: 'data'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
-  }
-]
 
 resource corePrjResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
@@ -85,10 +80,39 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12
   scope: coreHubResourceGroup
 }
 
+resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
+  name: hubVNetName
+  scope: coreHubResourceGroup
+}
+
 module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
   scope: corePrjResourceGroup
 }
+
+// Create a network security group for the default subnet
+module defaultNsg 'modules/nsg-prj.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'nsg')
+  scope: corePrjResourceGroup
+  params: {
+    location: location
+    namingStructure: coreNamingStructure
+    avdSubnetRange: hubVNet.properties.subnets[1].properties.addressPrefix
+  }
+}
+
+var subnets = [
+  {
+    name: 'default'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
+    nsgId: defaultNsg.outputs.nsgId
+  }
+  {
+    name: 'data'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
+    nsgId: ''
+  }
+]
 
 // Create the research project's VNet
 module vNetModule 'modules/vnet.bicep' = {
@@ -114,6 +138,7 @@ module hubPeeringModule 'modules/vnet-peering.bicep' = {
     remoteName: '${workloadName}${sequenceFormatted}'
     // Remote is the spoke
     remoteVNetId: vNetModule.outputs.vNetId
+    allowVirtualNetworkAccess: true
   }
 }
 
@@ -133,17 +158,46 @@ module spokePeeringModule 'modules/vnet-peering.bicep' = {
   }
 }
 
-// Create the research project's storage account
+module privateStorageAccountShortname 'common-modules/shortname.bicep' = {
+  name: 'privateStorageAccountShortName'
+  scope: corePrjResourceGroup
+  params: {
+    location: location
+    sequence: sequence
+    resourceType: 'st'
+    workloadName: workloadName
+    environment: environment
+    namingConvention: shortCoreNamingConvention
+    removeHyphens: true
+  }
+}
+
+module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
+  name: 'publicStorageAccountShortName'
+  scope: corePrjResourceGroup
+  params: {
+    location: location
+    sequence: sequence
+    resourceType: 'st'
+    workloadName: workloadName
+    environment: environment
+    namingConvention: replace(namingConvention, '{subwloadname}', 'd')
+    removeHyphens: true
+  }
+}
+
+// Create the research project's primary private storage account
 module privateStorageAccountModule 'modules/data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'data')
   scope: dataPrjResourceGroup
   params: {
+    namingStructure: coreNamingStructure
+    storageAccountName: privateStorageAccountShortname.outputs.shortName
     location: location
     privatize: true
-    namingStructure: dataNamingStructure
     containerNames: [
-      containerNames['exportApprovedContainerName']
-      containerNames['exportPendingContainerName']
+      containerNames.exportApprovedContainerName
+      containerNames.exportPendingContainerName
     ]
     vnetId: vNetModule.outputs.vNetId
     subnetId: vNetModule.outputs.subnetIds[1]
@@ -157,7 +211,7 @@ module dataAutomationModule 'modules/data.bicep' = {
   params: {
     location: location
     namingStructure: dataNamingStructure
-    publicStNamingStructure: replace(namingStructure, '{subwloadname}', 'pub')
+    publicStNamingStructure: replace(thisNamingStructure, '{subwloadname}', 'pub')
     workspaceName: '${workloadName}${sequenceFormatted}'
     roles: rolesModule.outputs.roles
     approverEmail: 'sven@aelterman.info'
@@ -166,8 +220,13 @@ module dataAutomationModule 'modules/data.bicep' = {
     privateStorageAccountName: privateStorageAccountModule.outputs.storageAccountName
     containerNames: containerNames
     tags: tags
+    publicStorageAccountName: publicStorageAccountShortname.outputs.shortName
   }
 }
 
 // TODO: Permissions to log into VMs?
 // TODO: VM to enroll with Intune?
+
+output vnetAddressSpace array = vNetModule.outputs.vNetAddressSpace
+output privateStorageAccountName string = privateStorageAccountShortname.outputs.shortName
+output publicStorageAccountName string = publicStorageAccountShortname.outputs.shortName

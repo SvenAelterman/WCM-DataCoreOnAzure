@@ -10,6 +10,7 @@ param privateStorageAccountRG string
 param containerNames object
 param approverEmail string
 param roles object
+param publicStorageAccountName string
 
 param tags object = {}
 
@@ -69,12 +70,13 @@ module publicStorageAccount 'data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'st-pub')
   scope: dataAutomationRG
   params: {
+    storageAccountName: publicStorageAccountName
     location: location
     namingStructure: publicStNamingStructure
     subwloadname: 'pub'
     containerNames: [
       // TODO: needs exported?
-      containerNames['ingestContainerName']
+      containerNames.ingestContainerName
     ]
     principalIds: [
       adf.outputs.principalId

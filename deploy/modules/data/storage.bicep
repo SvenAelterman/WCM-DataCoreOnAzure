@@ -8,14 +8,15 @@ param vnetId string = ''
 param subnetId string = ''
 param principalIds array = []
 param tags object = {}
+@maxLength(23)
+param storageAccountName string
 
 var assignRole = !empty(principalIds)
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
-var baseNameClean = replace(baseName, '-', '')
 var endpoint = 'privatelink.blob.${environment().suffixes.storage}'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
-  name: take(replace(baseNameClean, '{rtype}', 'st'), 24)
+  name: storageAccountName
   location: location
   kind: 'StorageV2'
   sku: {

@@ -15,7 +15,7 @@ Param(
 	[Parameter()]
 	[string]$WorkloadName = 'researchprj',
 	#
-	[int]$Sequence = 1,
+	[int]$Sequence = 2,
 	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}"
 )
 
@@ -29,6 +29,7 @@ $TemplateParameters = @{
 	hubSubscriptionId = '2715e6dd-7a1f-406c-9d9f-06122817408f'
 	hubWorkloadName   = 'researchhub'
 	sequence          = $Sequence
+	hubSequence       = 1
 	namingConvention  = $NamingConvention
 	tags              = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')

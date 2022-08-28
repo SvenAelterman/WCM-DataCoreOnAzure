@@ -34,6 +34,12 @@ param deploymentTime string = utcNow()
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
+var storageAccountSubResourcePrivateEndpoints = [
+  'blob'
+  'file'
+  'dfs'
+]
+
 // Naming structure only needs the resource type ({rtype}) replaced
 var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', 'c')
@@ -47,9 +53,10 @@ var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConve
 var hubVNetName = replace(hubCoreNamingStructure, '{rtype}', 'vnet')
 
 var containerNames = {
-  exportApprovedContainerName: 'export-approved'
-  ingestContainerName: 'ingest'
-  exportPendingContainerName: 'export-pending'
+  exportApproved: 'export-approved'
+  ingest: 'ingest'
+  exportPending: 'export-pending'
+  exportRequest: 'export-request'
 }
 
 resource corePrjResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -84,6 +91,14 @@ resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
   name: hubVNetName
   scope: coreHubResourceGroup
 }
+
+// TODO: Link with auto-registration Enabled to hub's 'research.aelterman.info' private DNS zone
+
+// The existing Private DNS zones for the storage account sub-resources
+resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing = [for subresource in storageAccountSubResourcePrivateEndpoints: {
+  name: 'privatelink.${subresource}.${az.environment().suffixes.storage}'
+  scope: coreHubResourceGroup
+}]
 
 module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
@@ -120,13 +135,21 @@ module vNetModule 'modules/vnet.bicep' = {
   scope: corePrjResourceGroup
   params: {
     location: location
-    subnetAddressPrefix: subnetAddressSpace
     subnets: subnets
     vnetName: replace(coreNamingStructure, '{rtype}', 'vnet')
     addressPrefix: vnetAddressSpace
     tags: tags
   }
 }
+
+module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-${subresource}')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: privateDnsZones[i].name
+    vnetId: vNetModule.outputs.vNetId
+  }
+}]
 
 // Peer hub to spoke (this)
 module hubPeeringModule 'modules/vnet-peering.bicep' = {
@@ -172,6 +195,35 @@ module privateStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
+// Create the research project's primary private storage account
+module privateStorageAccountModule 'modules/data/storage.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'data')
+  scope: dataPrjResourceGroup
+  params: {
+    namingStructure: coreNamingStructure
+    storageAccountName: privateStorageAccountShortname.outputs.shortName
+    location: location
+    privatize: true
+    containerNames: [
+      containerNames.exportRequest
+    ]
+    //vnetId: vNetModule.outputs.vNetId
+    subnetId: vNetModule.outputs.subnetIds[1]
+    tags: tags
+    fileShareNames: [
+      'shared'
+    ]
+    // privateEndpointSubResources: storageAccountSubResourcePrivateEndpoints
+    // privateDnsZoneIds: {}
+    privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+      subResourceName: subresource
+      dnsZoneId: privateDnsZones[i].id
+      dnsZoneName: privateDnsZones[i].name
+    }]
+  }
+}
+
+// Create air lock/drawbridge for data move
 module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
   name: 'publicStorageAccountShortName'
   scope: corePrjResourceGroup
@@ -186,26 +238,6 @@ module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
-// Create the research project's primary private storage account
-module privateStorageAccountModule 'modules/data/storage.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'data')
-  scope: dataPrjResourceGroup
-  params: {
-    namingStructure: coreNamingStructure
-    storageAccountName: privateStorageAccountShortname.outputs.shortName
-    location: location
-    privatize: true
-    containerNames: [
-      containerNames.exportApprovedContainerName
-      containerNames.exportPendingContainerName
-    ]
-    vnetId: vNetModule.outputs.vNetId
-    subnetId: vNetModule.outputs.subnetIds[1]
-    tags: tags
-  }
-}
-
-// Create air lock/drawbridge for data move
 module dataAutomationModule 'modules/data.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'data')
   params: {
@@ -230,3 +262,4 @@ module dataAutomationModule 'modules/data.bicep' = {
 output vnetAddressSpace array = vNetModule.outputs.vNetAddressSpace
 output privateStorageAccountName string = privateStorageAccountShortname.outputs.shortName
 output publicStorageAccountName string = publicStorageAccountShortname.outputs.shortName
+output dataResourceGroupName string = dataPrjResourceGroup.name

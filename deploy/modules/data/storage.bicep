@@ -1,21 +1,26 @@
 param location string
 param namingStructure string
-param subwloadname string = ''
 param containerNames array
-param skuName string = 'Standard_LRS'
-param privatize bool
-param vnetId string = ''
-param subnetId string = ''
-param principalIds array = []
-param tags object = {}
 @maxLength(23)
 param storageAccountName string
+param privatize bool
+
+// Must be specified if privatize == true
+param privateEndpointInfo array = []
+param subnetId string = ''
+
+param fileShareNames array = []
+param subwloadname string = ''
+param skuName string = 'Standard_LRS'
+//param vnetId string = ''
+param principalIds array = []
+param tags object = {}
 
 var assignRole = !empty(principalIds)
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
-var endpoint = 'privatelink.blob.${environment().suffixes.storage}'
+//var endpoint = 'privatelink.blob.${environment().suffixes.storage}'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
   name: storageAccountName
   location: location
   kind: 'StorageV2'
@@ -24,6 +29,8 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
   }
   properties: {
     minimumTlsVersion: 'TLS1_2'
+    allowedCopyScope: privatize ? 'AAD' : null
+    defaultToOAuthAuthentication: true
     allowBlobPublicAccess: false
     isHnsEnabled: true
     supportsHttpsTrafficOnly: true
@@ -32,14 +39,14 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-06-01' = {
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: privatize ? 'Deny' : 'Allow' // force deny inbound traffic
-      ipRules: [] // Dont allow any IPs through the firewall
+      ipRules: [] // Don't allow any IPs through the firewall
       virtualNetworkRules: [] // Do not integrate via vnet due to service delegation requirements
     }
   }
   tags: tags
 }
 
-resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2021-06-01' = {
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2021-09-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -53,67 +60,73 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2021-06-01
   }
 }
 
-resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-06-01' = [for c in containerNames: {
+// Create each required container
+resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-09-01' = [for c in containerNames: {
   parent: blobServices
   name: c
 }]
 
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = if (privatize) {
-  name: replace(baseName, '{rtype}', 'pep')
+resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2021-09-01' = {
+  parent: storageAccount
+  name: 'default'
+  properties: {
+    shareDeleteRetentionPolicy: {
+      days: 7
+      enabled: true
+    }
+    protocolSettings: {
+      smb: {
+        versions: 'SMB3.1.1;'
+        authenticationMethods: 'Kerberos;'
+        kerberosTicketEncryption: 'AES-256;'
+        channelEncryption: 'AES-256-GCM;'
+      }
+    }
+  }
+}
+
+// Create each required file share
+resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-09-01' = [for fs in fileShareNames: {
+  parent: fileServices
+  name: fs
+}]
+
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = [for info in privateEndpointInfo: if (privatize) {
+  name: replace(baseName, '{rtype}', 'pep-${info.subResourceName}')
   location: location
-  tags: {}
+  tags: tags
   properties: {
     subnet: {
       id: subnetId
     }
     privateLinkServiceConnections: [
       {
-        name: replace(baseName, '{rtype}', 'pep')
+        name: replace(baseName, '{rtype}', 'pep-${info.subResourceName}')
         properties: {
           privateLinkServiceId: storageAccount.id
           groupIds: [
-            'blob'
+            info.subResourceName
           ]
         }
       }
     ]
   }
-}
+}]
 
-resource privatelink_blob_core_windows_net 'Microsoft.Network/privateDnsZones@2018-09-01' = if (privatize) {
-  name: endpoint
-  location: 'global'
-  properties: {}
-  tags: tags
-}
-
-resource privateEndpointDNSGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-03-01' = if (privatize) {
-  name: '${privateEndpoint.name}/default'
+resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-03-01' = [for (info, i) in privateEndpointInfo: if (privatize) {
+  name: 'default'
+  parent: privateEndpoint[i]
   properties: {
     privateDnsZoneConfigs: [
       {
-        name: 'privatelink-blob-core-windows-net'
+        name: replace(info.dnsZoneName, '.', '-')
         properties: {
-          privateDnsZoneId: privatelink_blob_core_windows_net.id
+          privateDnsZoneId: info.dnsZoneId
         }
       }
     ]
   }
-}
-
-resource privatelink_blob_core_windows_net_virtualNetworkId 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2018-09-01' = if (privatize) {
-  name: '${endpoint}/${uniqueString(vnetId)}'
-  location: 'global'
-  properties: {
-    virtualNetwork: {
-      id: vnetId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    privatelink_blob_core_windows_net
-  ]
-}
+}]
 
 // Assign Storage Blob data contrib to principalId if sent to this module
 resource rbacAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = [for i in principalIds: if (assignRole) {

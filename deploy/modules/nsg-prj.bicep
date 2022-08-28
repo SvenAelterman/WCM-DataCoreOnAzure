@@ -49,19 +49,19 @@ var securityRules = [
       destinationPortRange: '*'
     }
   }
-  {
-    name: 'Allow_AzDevUpd'
-    properties: {
-      direction: 'Outbound'
-      priority: 230
-      protocol: '*'
-      access: 'Allow'
-      sourceAddressPrefix: 'VirtualNetwork'
-      sourcePortRange: '*'
-      destinationAddressPrefix: 'AzureDeviceUpdate'
-      destinationPortRange: '*'
-    }
-  }
+  // {
+  //   name: 'Allow_AzDevUpd'
+  //   properties: {
+  //     direction: 'Outbound'
+  //     priority: 230
+  //     protocol: '*'
+  //     access: 'Allow'
+  //     sourceAddressPrefix: 'VirtualNetwork'
+  //     sourcePortRange: '*'
+  //     destinationAddressPrefix: 'AzureDeviceUpdate'
+  //     destinationPortRange: '*'
+  //   }
+  // }
   {
     name: 'Allow_FrontDoor'
     properties: {

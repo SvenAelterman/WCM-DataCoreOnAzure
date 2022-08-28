@@ -15,7 +15,7 @@ Param(
 	[Parameter()]
 	[string]$WorkloadName = 'researchprj',
 	#
-	[int]$Sequence = 2,
+	[int]$Sequence = 1,
 	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}"
 )
 
@@ -48,6 +48,37 @@ $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$E
 $DeploymentResult
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
-}
+	# Extract output values from the DeploymentResult
+	[string]$privateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
+	[string]$dataResourceGroupName = $DeploymentResult.Outputs.dataResourceGroupName.Value
 
-# TODO: Project templates: peering, NSGs
+	$azContext = Get-AzContext
+	# AAD-join private storage account
+	[string]$tenantId = $azContext.Tenant.Id
+	[string]$subscriptionId = $azContext.Subscription.Id
+
+	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $subscriptionId, $dataResourceGroupName, $privateStorageAccountName);
+
+	Write-Host $privateStorageAccountName ", " $dataResourceGroupName ", " $tenantId ", " $subscriptionId "," $Uri
+
+	$json = @{properties = @{azureFilesIdentityBasedAuthentication = @{directoryServiceOptions = "AADKERB" } } };
+	$json = $json | ConvertTo-Json -Depth 99
+
+	$token = $(Get-AzAccessToken).Token
+	$headers = @{ Authorization = "Bearer $token" }
+
+	try {
+		Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
+		New-AzStorageAccountKey -ResourceGroupName $dataResourceGroupName -Name $privateStorageAccountName -KeyName kerb1 -ErrorAction Stop
+
+		Get-AzureADServicePrincipal -Searchstring "[Storage Account] $privateStorageAccountName.file.core.windows.net"
+	}
+	catch {
+		Write-Host $_.Exception.ToString()
+		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
+	}
+	
+	# TODO: set permissions on share(s) (read-only: use app attach sample)
+
+
+}

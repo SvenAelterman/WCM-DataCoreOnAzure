@@ -37,7 +37,7 @@ module uami 'data/uami.bicep' = {
   }
 }
 
-// adf
+// Azure Data Factory resource and contents
 module adf 'data/adf.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'adf')
   scope: dataAutomationRG
@@ -51,7 +51,7 @@ module adf 'data/adf.bicep' = {
   }
 }
 
-//logic app
+// Logic app for approval workflow
 module logicApp 'data/logicApp.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'logicApp')
   scope: dataAutomationRG
@@ -76,7 +76,7 @@ module publicStorageAccount 'data/storage.bicep' = {
     subwloadname: 'pub'
     containerNames: [
       // TODO: needs exported?
-      containerNames.ingestContainerName
+      containerNames.ingest
     ]
     principalIds: [
       adf.outputs.principalId
@@ -126,7 +126,7 @@ module ingestTrigger 'data/adfTrigger.bicep' = {
     ingestPipelineName: adf.outputs.pipelineName
     sourceStorageAccountName: publicStorageAccount.outputs.storageAccountName
     sinkStorageAccountName: privateStorageAccountName
-    containerName: containerNames['ingestContainerName']
+    containerName: containerNames.ingest
   }
 }
 
@@ -141,7 +141,7 @@ module exportTrigger 'data/adfTrigger.bicep' = {
     ingestPipelineName: adf.outputs.pipelineName
     sourceStorageAccountName: privateStorageAccountName
     sinkStorageAccountName: publicStorageAccount.outputs.storageAccountName
-    containerName: containerNames['exportApprovedContainerName']
+    containerName: containerNames.exportApproved
   }
 }
 

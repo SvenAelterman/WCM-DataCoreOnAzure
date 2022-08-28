@@ -13,6 +13,9 @@ param location string
 param environment string
 param workloadName string
 
+// TODO: Create private DNS zone with this name
+param computeDnsSuffix string
+
 param vnetAddressSpace string = '10.19.0.0/16'
 param subnetAddressSpace string = '10.19.{octet3}.0/24'
 
@@ -27,10 +30,17 @@ param avdVmHostNameStructure string = 'vm-avd'
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
+var storageAccountSubResourcePrivateEndpoints = [
+  'blob'
+  'file'
+  'dfs'
+]
+
 // Naming structure only needs the resource type ({rtype}) replaced
 var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
+var dataNamingStructure = replace(namingStructure, '{subwloadname}', 'data')
 
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
@@ -40,6 +50,13 @@ resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = 
 
 resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(avdNamingStructure, '{rtype}', 'rg')
+  location: location
+  tags: tags
+}
+
+// Contains the storage account for reviewing export requests
+resource dataHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: replace(dataNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
@@ -56,6 +73,24 @@ module abbreviationsModule 'common-modules/abbreviations.bicep' = {
 
 var vnetAbbrev = abbreviationsModule.outputs.abbreviations['Virtual Network']
 
+var hubVNetSubnets = [
+  {
+    name: 'default'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
+    nsgId: ''
+  }
+  {
+    name: 'avd'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
+    nsgId: ''
+  }
+  {
+    name: 'data'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '2')
+    nsgId: ''
+  }
+]
+
 module hubVnetModule 'modules/vnet.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'vnet-hub-core')
   scope: coreHubResourceGroup
@@ -63,10 +98,30 @@ module hubVnetModule 'modules/vnet.bicep' = {
     vnetName: replace(coreNamingStructure, '{rtype}', vnetAbbrev)
     location: location
     addressPrefix: vnetAddressSpace
-    subnetAddressPrefix: subnetAddressSpace
     tags: tags
+    subnets: hubVNetSubnets
   }
 }
+
+module privateDnsZones 'modules/privateDnsZone.bicep' = [for subresource in storageAccountSubResourcePrivateEndpoints: {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-${subresource}')
+  scope: coreHubResourceGroup
+  params: {
+    zoneName: 'privatelink.${subresource}.${az.environment().suffixes.storage}'
+  }
+}]
+
+module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-${subresource}')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: privateDnsZones[i].outputs.zoneName
+    vnetId: hubVnetModule.outputs.vNetId
+  }
+  dependsOn: [
+    privateDnsZones[i]
+  ]
+}]
 
 module logModule 'modules/log.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'log')
@@ -91,7 +146,7 @@ module hubAvdModule 'modules/avd.bicep' = {
     abbreviations: abbreviationsModule.outputs.abbreviations
     deploymentNameStructure: deploymentNameStructure
     avdVmHostNameStructure: avdVmHostNameStructure
-    avdSubnetId: hubVnetModule.outputs.avdSubnetId
+    avdSubnetId: hubVnetModule.outputs.subnetIds[1]
     environment: environment
   }
 }
@@ -106,3 +161,43 @@ module computeGalleryModule 'modules/gal.bicep' = {
     tags: tags
   }
 }
+
+// Create name for the storage account used to hold data while being reviewed
+module reviewStorageAccountName 'common-modules/shortname.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'stname')
+  scope: dataHubResourceGroup
+  params: {
+    environment: environment
+    location: location
+    namingConvention: replace(namingConvention, '{subwloadname}', 'd')
+    resourceType: 'st'
+    sequence: sequence
+    workloadName: workloadName
+    removeHyphens: true
+  }
+}
+
+module reviewStorageModule 'modules/data/storage.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'st')
+  scope: dataHubResourceGroup
+  params: {
+    containerNames: [
+      // TODO: no hardcoding here
+      'export-requested'
+      'export-approved'
+    ]
+    location: location
+    namingStructure: dataNamingStructure
+    privatize: true
+    storageAccountName: reviewStorageAccountName.outputs.shortName
+    subnetId: hubVnetModule.outputs.subnetIds[2]
+    subwloadname: 'data'
+    privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+      subResourceName: subresource
+      dnsZoneId: privateDnsZones[i].outputs.zoneId
+      dnsZoneName: privateDnsZones[i].outputs.zoneName
+    }]
+  }
+}
+
+output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: privateDnsZones[i].outputs.zoneId]

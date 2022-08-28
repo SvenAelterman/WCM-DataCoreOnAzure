@@ -11,12 +11,10 @@ Param(
 	# The environment descriptor
 	[ValidateSet('Test', 'Demo', 'Prod')]
 	[string]$Environment = 'Demo',
-	#
-	[Parameter()]
 	[string]$WorkloadName = 'researchhub',
-	#
 	[int]$Sequence = 1,
-	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}"
+	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
+	[string]$computeDnsSuffix = 'research.aelterman.info'
 )
 
 $TemplateParameters = @{
@@ -24,6 +22,7 @@ $TemplateParameters = @{
 	location         = $Location
 	environment      = $Environment
 	workloadName     = $WorkloadName
+	computeDnsSuffix = $computeDnsSuffix
 
 	# OPTIONAL
 	sequence         = $Sequence
@@ -47,6 +46,9 @@ $DeploymentResult
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AFTER ACTIONS
 	# - Assign access to AVD application group + Virtual Machine User Login
+
 }
+
+# TODO: Domain-join hub (review) private storage accounts
 
 # TODO: NSGs

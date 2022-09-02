@@ -21,6 +21,19 @@ var securityRules = [
     }
   }
   {
+    name: 'Allow_AzureUpdateDelivery'
+    properties: {
+      direction: 'Outbound'
+      priority: 203
+      protocol: 'TCP'
+      access: 'Allow'
+      sourceAddressPrefix: 'VirtualNetwork'
+      sourcePortRange: '*'
+      destinationAddressPrefix: 'AzureUpdateDelivery'
+      destinationPortRange: '443'
+    }
+  }
+  {
     name: 'Allow_AzureAD_ServiceTag'
     properties: {
       direction: 'Outbound'
@@ -49,21 +62,9 @@ var securityRules = [
       destinationPortRange: '*'
     }
   }
-  // {
-  //   name: 'Allow_AzDevUpd'
-  //   properties: {
-  //     direction: 'Outbound'
-  //     priority: 230
-  //     protocol: '*'
-  //     access: 'Allow'
-  //     sourceAddressPrefix: 'VirtualNetwork'
-  //     sourcePortRange: '*'
-  //     destinationAddressPrefix: 'AzureDeviceUpdate'
-  //     destinationPortRange: '*'
-  //   }
-  // }
   {
-    name: 'Allow_FrontDoor'
+    name: 'Allow_FrontDoor_Frontend'
+    // Required for Azure AD
     properties: {
       direction: 'Outbound'
       priority: 240
@@ -79,10 +80,27 @@ var securityRules = [
     }
   }
   {
+    name: 'Allow_FrontDoor_FirstParty'
+    // Required for Azure Update Delivery
+    properties: {
+      direction: 'Outbound'
+      priority: 241
+      protocol: 'TCP'
+      access: 'Allow'
+      sourceAddressPrefix: 'VirtualNetwork'
+      sourcePortRange: '*'
+      destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
+      destinationPortRanges: [
+        '80'
+        '443'
+      ]
+    }
+  }
+  {
     name: 'Allow_AzureAD_IPv4'
     properties: {
       direction: 'Outbound'
-      priority: 250
+      priority: 211
       protocol: 'TCP'
       access: 'Allow'
       sourceAddressPrefix: 'VirtualNetwork'
@@ -937,7 +955,7 @@ var securityRules = [
     name: 'Allow_AzureAD_IPv6'
     properties: {
       direction: 'Outbound'
-      priority: 251
+      priority: 212
       protocol: 'TCP'
       access: 'Allow'
       sourceAddressPrefix: 'VirtualNetwork'
@@ -1172,6 +1190,19 @@ var securityRules = [
         '80'
         '443'
       ]
+    }
+  }
+  {
+    name: 'Allow_GuestAndHybridManagement'
+    properties: {
+      direction: 'Outbound'
+      priority: 260
+      protocol: '*'
+      access: 'Allow'
+      sourceAddressPrefix: 'VirtualNetwork'
+      sourcePortRange: '*'
+      destinationAddressPrefix: 'GuestAndHybridManagement'
+      destinationPortRange: '*'
     }
   }
   {

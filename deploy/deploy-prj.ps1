@@ -71,7 +71,7 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
 		New-AzStorageAccountKey -ResourceGroupName $dataResourceGroupName -Name $privateStorageAccountName -KeyName kerb1 -ErrorAction Stop
 
-		Get-AzureADServicePrincipal -Searchstring "[Storage Account] $privateStorageAccountName.file.core.windows.net"
+		Get-AzADServicePrincipal -Searchstring "[Storage Account] $privateStorageAccountName.file.core.windows.net"
 	}
 	catch {
 		Write-Host $_.Exception.ToString()

@@ -26,6 +26,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-05-01' = {
         networkSecurityGroup: empty(subnet.nsgId) ? null : {
           id: subnet.nsgId
         }
+        routeTable: empty(subnet.routeTableId) ? null : {
+          id: subnet.routeTableId
+        }
       }
     }]
   }
@@ -41,10 +44,16 @@ module networkWatcher 'networkWatcherRG.bicep' = if (enableNetworkWatcher) {
   }
 }
 
-// Output the resource ID of the AVD subnet to use later
-// TODO: Remove this in favor of the array
-//output avdSubnetId string = vnet.properties.subnets[1].id
+// Get the subnets' IDs in the same order as in the parameter array
+// The value of vnet.subnets might be out of order
+resource subnetRes 'Microsoft.Network/virtualNetworks/subnets@2022-01-01' existing = [for subnet in subnets: {
+  name: subnet.name
+  parent: vnet
+}]
+
 output vNetId string = vnet.id
-output subnetIds array = [for (subnet, i) in subnets: vnet.properties.subnets[i].id]
+// Ensure the subnet IDs are output in the same order as they were provided
+// See https://github.com/Azure/bicep/discussions/4953 for background on this technique
+output subnetIds array = [for (subnet, i) in subnets: subnetRes[i].id]
 output vNetName string = vnet.name
 output vNetAddressSpace array = vnet.properties.addressSpace.addressPrefixes

@@ -11,20 +11,26 @@ param containerNames object
 param approverEmail string
 param roles object
 param publicStorageAccountName string
+param projectFileShareName string
+param keyVaultName string
+param keyVaultResourceGroupName string
+param privateStorageAccountConnStringSecretName string
 
 param tags object = {}
 
-// get the workspace resource group
+// Get the project's DATA resource group
+// This is where the private storage account is, and where we'll add the data automation resources
 resource dataAutomationRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: privateStorageAccountRG
 }
 
+// Get a reference to the already existing private storage account
 resource privateStorageAccount 'Microsoft.Storage/storageAccounts@2021-02-01' existing = {
   name: privateStorageAccountName
   scope: dataAutomationRG
 }
 
-// user assigned managed identity for Post Deployment Tasks
+// User Assigned Managed Identity to be used for post-deployment tasks
 module uami 'data/uami.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'uami')
   scope: dataAutomationRG
@@ -38,7 +44,7 @@ module uami 'data/uami.bicep' = {
 }
 
 // Azure Data Factory resource and contents
-module adf 'data/adf.bicep' = {
+module adfModule 'data/adf.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'adf')
   scope: dataAutomationRG
   params: {
@@ -47,26 +53,30 @@ module adf 'data/adf.bicep' = {
     deploymentNameStructure: deploymentNameStructure
     privateStorageAcctName: privateStorageAccountName
     userAssignedIdentityId: uami.outputs.managedIdentityId
+    fileShareName: projectFileShareName
     tags: tags
+    keyVaultName: keyVaultName
+    keyVaultResourceGroupName: keyVaultResourceGroupName
+    privateStorageAccountConnStringSecretName: privateStorageAccountConnStringSecretName
   }
 }
 
 // Logic app for approval workflow
-module logicApp 'data/logicApp.bicep' = {
+module logicAppModule 'data/logicApp.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'logicApp')
   scope: dataAutomationRG
   params: {
     namingStructure: namingStructure
     location: location
     storageAcctName: privateStorageAccountName
-    adfName: adf.outputs.name
+    adfName: adfModule.outputs.name
     approverEmail: approverEmail
     tags: tags
   }
 }
 
 // Add Public Storage
-module publicStorageAccount 'data/storage.bicep' = {
+module publicStorageAccountModule 'data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'st-pub')
   scope: dataAutomationRG
   params: {
@@ -79,7 +89,7 @@ module publicStorageAccount 'data/storage.bicep' = {
       containerNames.ingest
     ]
     principalIds: [
-      adf.outputs.principalId
+      adfModule.outputs.principalId
     ]
     privatize: false
     tags: tags
@@ -87,21 +97,21 @@ module publicStorageAccount 'data/storage.bicep' = {
 }
 
 // Setup System Event Grid Topic for public storage account. We only do this here to control the name of the event grid topic
-module eventGridForPublic 'data/eventGrid.bicep' = {
+module eventGridForPublicModule 'data/eventGrid.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'evgt-public')
   scope: dataAutomationRG
   params: {
     location: location
     namingStructure: publicStNamingStructure
-    subwloadname: publicStorageAccount.outputs.storageAccountName
-    resourceId: publicStorageAccount.outputs.storageAccountId
+    subwloadname: publicStorageAccountModule.outputs.storageAccountName
+    resourceId: publicStorageAccountModule.outputs.storageAccountId
     topicName: 'Microsoft.Storage.StorageAccounts'
     tags: tags
   }
 }
 
 // Setup System Event Grid Topic for private storage account. We only do this here to control the name of the event grid topic
-module eventGridForPrivate 'data/eventGrid.bicep' = {
+module eventGridForPrivateModule 'data/eventGrid.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'evgt-private')
   scope: dataAutomationRG
   params: {
@@ -115,55 +125,56 @@ module eventGridForPrivate 'data/eventGrid.bicep' = {
 }
 
 //
-module ingestTrigger 'data/adfTrigger.bicep' = {
+module ingestTriggerModule 'data/adfTrigger.bicep' = {
   scope: dataAutomationRG
   name: replace(deploymentNameStructure, '{rtype}', 'adf-trigger-public')
   params: {
-    adfName: adf.outputs.name
+    adfName: adfModule.outputs.name
     workspaceName: workspaceName
-    storageAccountId: publicStorageAccount.outputs.storageAccountId
+    storageAccountId: publicStorageAccountModule.outputs.storageAccountId
     storageAccountType: 'Public'
-    ingestPipelineName: adf.outputs.pipelineName
-    sourceStorageAccountName: publicStorageAccount.outputs.storageAccountName
+    ingestPipelineName: adfModule.outputs.pipelineName
+    sourceStorageAccountName: publicStorageAccountModule.outputs.storageAccountName
     sinkStorageAccountName: privateStorageAccountName
     containerName: containerNames.ingest
   }
 }
 
-module exportTrigger 'data/adfTrigger.bicep' = {
+module exportTriggerModule 'data/adfTrigger.bicep' = {
   scope: dataAutomationRG
   name: replace(deploymentNameStructure, '{rtype}', 'adf-trigger-private')
   params: {
-    adfName: adf.outputs.name
+    adfName: adfModule.outputs.name
     workspaceName: workspaceName
     storageAccountId: privateStorageAccount.id
     storageAccountType: 'Private'
-    ingestPipelineName: adf.outputs.pipelineName
+    ingestPipelineName: adfModule.outputs.pipelineName
     sourceStorageAccountName: privateStorageAccountName
-    sinkStorageAccountName: publicStorageAccount.outputs.storageAccountName
+    sinkStorageAccountName: publicStorageAccountModule.outputs.storageAccountName
     containerName: containerNames.exportApproved
   }
 }
 
-module adfManagedPrivateEndpoint 'data/adfManagedPrivateEndpoint.bicep' = {
+module adfManagedPrivateEndpointModule 'data/adfManagedPrivateEndpoint.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'adf-pep')
   scope: dataAutomationRG
   params: {
-    adfName: adf.outputs.name
+    adfName: adfModule.outputs.name
     privateStorageAccountId: privateStorageAccount.id
     privateStorageAccountName: privateStorageAccountName
   }
 }
 
-// deployment script for post deployment tasks
-module deploymentScript 'data/deploymentScript.bicep' = {
+// Deployment script for post deployment tasks
+// * Start the triggers in the ADF
+module startTriggerDeploymentScriptModule 'data/deploymentScript.bicep' = {
   name: 'StartTrigger-${replace(deploymentNameStructure, '{rtype}', 'dplscr')}'
   scope: dataAutomationRG
   params: {
     location: location
     subwloadname: 'StartTriggers'
     namingStructure: namingStructure
-    arguments: ' -ResourceGroupName ${dataAutomationRG.name} -azureDataFactoryName ${adf.outputs.name} -privateLinkResourceId ${adfManagedPrivateEndpoint.outputs.privateEndpointId}'
+    arguments: ' -ResourceGroupName ${dataAutomationRG.name} -azureDataFactoryName ${adfModule.outputs.name} -privateLinkResourceId ${adfManagedPrivateEndpointModule.outputs.privateEndpointId}'
     scriptContent: '\r\n          param(\r\n            [string] [Parameter(Mandatory=$true)] $ResourceGroupName,\r\n            [string] [Parameter(Mandatory=$true)] $azureDataFactoryName,\r\n            [string] [Parameter(Mandatory=$true)] $privateLinkResourceId\r\n          )\r\n\r\n          Connect-AzAccount -Identity\r\n\r\n          # Start Triggers\r\n          Get-AzDataFactoryV2Trigger -DataFactoryName $azureDataFactoryName -ResourceGroupName $ResourceGroupName | Start-AzDataFactoryV2Trigger -Force | Out-Null\r\n\r\n          # Approve DFS private endpoint\r\n          foreach ($privateLinkConnection in (Get-AzPrivateEndpointConnection -PrivateLinkResourceId $privateLinkResourceId)) { if ($privateLinkConnection.PrivateLinkServiceConnectionState.Status -eq "Pending") { Approve-AzPrivateEndpointConnection -ResourceId $privateLinkConnection.id } }\r\n        '
     userAssignedIdentityId: uami.outputs.managedIdentityId
     tags: tags

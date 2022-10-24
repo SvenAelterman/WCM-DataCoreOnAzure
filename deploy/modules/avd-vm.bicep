@@ -10,6 +10,7 @@ param avdSubnetId string
 param vmCount int = 1
 
 // Use the same VM templates as used by the Add VM to hostpool process
+#disable-next-line no-hardcoded-env-urls
 var nestedTemplatesLocation = 'https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/armtemplates/Hostpool_12-9-2021/nestedTemplates/'
 var vmTemplateUri = '${nestedTemplatesLocation}managedDisks-galleryvm.json'
 
@@ -40,6 +41,7 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
     }
     parameters: {
       artifactsLocation: {
+        #disable-next-line no-hardcoded-env-urls
         value: 'https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/Configuration_02-23-2022.zip'
       }
       availabilityOption: {

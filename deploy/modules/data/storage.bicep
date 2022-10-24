@@ -12,13 +12,11 @@ param subnetId string = ''
 param fileShareNames array = []
 param subwloadname string = ''
 param skuName string = 'Standard_LRS'
-//param vnetId string = ''
 param principalIds array = []
 param tags object = {}
 
 var assignRole = !empty(principalIds)
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
-//var endpoint = 'privatelink.blob.${environment().suffixes.storage}'
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
   name: storageAccountName
@@ -76,10 +74,10 @@ resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2021-09-01
     }
     protocolSettings: {
       smb: {
-        versions: 'SMB3.1.1;'
+        versions: 'SMB3.0;SMB3.1.1;'
         authenticationMethods: 'Kerberos;'
         kerberosTicketEncryption: 'AES-256;'
-        channelEncryption: 'AES-256-GCM;'
+        channelEncryption: 'AES-128-GCM;AES-256-GCM;'
       }
     }
   }
@@ -129,7 +127,7 @@ resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZ
 }]
 
 // Assign Storage Blob data contrib to principalId if sent to this module
-resource rbacAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = [for i in principalIds: if (assignRole) {
+resource rbacAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in principalIds: if (assignRole) {
   name: guid('rbac-${storageAccount.name}-${i}')
   scope: storageAccount
   properties: {

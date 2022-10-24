@@ -16,6 +16,8 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' existing = {
   name: adfName
 }
 
+// As of 2022-10-23, Bicep does not have type info for this resource type
+#disable-next-line BCP081
 resource adfConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   name: 'api-${adfName}'
   location: location
@@ -30,6 +32,8 @@ resource adfConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   tags: tags
 }
 
+// As of 2022-10-23, Bicep does not have type info for this resource type
+#disable-next-line BCP081
 resource stgConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   name: 'api-${storageAcctName}'
   location: location
@@ -47,6 +51,8 @@ resource stgConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   tags: tags
 }
 
+// As of 2022-10-23, Bicep does not have type info for this resource type
+#disable-next-line BCP081
 resource emailConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   name: 'api-office365'
   location: location

@@ -14,6 +14,7 @@ param environment string
 param workloadName string
 
 // TODO: Create private DNS zone with this name
+#disable-next-line no-unused-params
 param computeDnsSuffix string
 
 param vnetAddressSpace string = '10.19.0.0/16'
@@ -25,6 +26,7 @@ param sequence int = 1
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param deploymentTime string = utcNow()
 param avdVmHostNameStructure string = 'vm-avd'
+param deployBastionHost bool = true
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
@@ -78,16 +80,37 @@ var hubVNetSubnets = [
     name: 'default'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
     nsgId: ''
+    routeTableId: ''
   }
   {
     name: 'avd'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
     nsgId: ''
+    routeTableId: ''
   }
   {
     name: 'data'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '2')
     nsgId: ''
+    routeTableId: ''
+  }
+  {
+    name: 'AzureFirewallSubnet'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '254')
+    nsgId: ''
+    routeTableId: ''
+  }
+  {
+    name: 'AzureFirewallManagementSubnet'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '253')
+    nsgId: ''
+    routeTableId: ''
+  }
+  {
+    name: 'AzureBastionSubnet'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '252')
+    nsgId: ''
+    routeTableId: ''
   }
 ]
 
@@ -197,6 +220,29 @@ module reviewStorageModule 'modules/data/storage.bicep' = {
       dnsZoneId: privateDnsZones[i].outputs.zoneId
       dnsZoneName: privateDnsZones[i].outputs.zoneName
     }]
+  }
+}
+
+module bastionModule 'modules/bastion.bicep' = if (deployBastionHost) {
+  name: replace(deploymentNameStructure, '{rtype}', 'bas')
+  scope: coreHubResourceGroup
+  params: {
+    namingStructure: coreNamingStructure
+    location: location
+    bastionSubnetId: hubVnetModule.outputs.subnetIds[5]
+    tags: tags
+  }
+}
+
+module azureFirewallModule 'modules/azfw.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'fw')
+  scope: coreHubResourceGroup
+  params: {
+    firewallSubnetId: hubVnetModule.outputs.subnetIds[3]
+    fwManagementSubnetId: hubVnetModule.outputs.subnetIds[4]
+    location: location
+    namingStructure: coreNamingStructure
+    tags: tags
   }
 }
 

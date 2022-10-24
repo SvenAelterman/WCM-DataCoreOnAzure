@@ -19,14 +19,17 @@ param workloadName string
 param sequence int
 param removeHyphens bool = false
 
+// Define the behavior of this module for each supported resource type
 var Defs = {
   kv: {
     lowerCase: false
     maxLength: 24
+    alwaysRemoveHyphens: false
   }
   st: {
     lowerCase: true
     maxLength: 23
+    alwaysRemoveHyphens: true
   }
 }
 
@@ -37,11 +40,14 @@ var shortLocations = {
 
 var maxLength = Defs[resourceType].maxLength
 var lowerCase = Defs[resourceType].lowerCase
+// Hyphens must be removed for certain resource types (storage accounts)
+// and might be removed based on parameter input for others
+var doRemoveHyphens = (Defs[resourceType].alwaysRemoveHyphens || removeHyphens)
 
 // Translate the regular location value to a shorter value
 var shortLocationValue = shortLocations[location]
 var shortNameAnyLength = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(take(environment, 1))), '{loc}', shortLocationValue), '{seq}', string(sequence)), '{wloadname}', workloadName), '{rtype}', resourceType)
-var shortNameAnyLengthHyphensProcessed = removeHyphens ? replace(shortNameAnyLength, '-', '') : shortNameAnyLength
+var shortNameAnyLengthHyphensProcessed = doRemoveHyphens ? replace(shortNameAnyLength, '-', '') : shortNameAnyLength
 var shortNameAnyLengthHyphensProcessedCased = lowerCase ? toLower(shortNameAnyLengthHyphensProcessed) : shortNameAnyLengthHyphensProcessed
 
 output shortName string = take(shortNameAnyLengthHyphensProcessedCased, maxLength)

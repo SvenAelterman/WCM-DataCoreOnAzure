@@ -22,10 +22,11 @@ resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2021-09-03-preview'
     preferredAppGroupType: 'RailApplications'
     customRdpProperty: 'drivestoredirect:s:0;audiomode:i:0;videoplaybackmode:i:1;redirectclipboard:i:0;redirectprinters:i:0;devicestoredirect:s:0;redirectcomports:i:0;redirectsmartcards:i:1;usbdevicestoredirect:s:0;enablecredsspsupport:i:1;use multimon:i:1;targetisaadjoined:i:1;'
     friendlyName: '${environment} Research Enclave Access'
+    // TODO: startVMOnConnect requires role configuration
     startVMOnConnect: true
     registrationInfo: {
       registrationTokenOperation: 'Update'
-      // Expire the new reigstration token in two days
+      // Expire the new registration token in two days
       expirationTime: dateTimeAdd(baseTime, 'P2D')
     }
   }
@@ -82,4 +83,4 @@ module avdVM 'avd-vmRG.bicep' = {
   }
 }
 
-// TODO: Create ASG for hosts
+// TODO: Create ASG for hosts?

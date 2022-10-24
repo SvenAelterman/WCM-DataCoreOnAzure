@@ -25,7 +25,7 @@
 		"sink": {
 			"type": "BinarySink",
 			"storeSettings": {
-				"type": "AzureBlobFSWriteSettings"
+				"type": "AzureFileStorageWriteSettings"
 			}
 		},
 		"enableStaging": false
@@ -52,19 +52,15 @@
 	],
 	"outputs": [
 		{
-			"referenceName": "DfsDataset",
+			"referenceName": "AzFilesDataset",
 			"type": "DatasetReference",
 			"parameters": {
-				"storageAccountName": {
-					"value": "@pipeline().parameters.sinkStorageAccountName",
-					"type": "Expression"
-				},
-				"folderPath": {
-					"value": "@pipeline().parameters.sinkFolderPath",
-					"type": "Expression"
-				},
 				"fileName": {
 					"value": "@pipeline().parameters.fileName",
+					"type": "Expression"
+				},
+				"storageAccountName": {
+					"value": "@pipeline().parameters.sinkStorageAccountName",
 					"type": "Expression"
 				}
 			}

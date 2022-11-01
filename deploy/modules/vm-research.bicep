@@ -16,14 +16,27 @@ param osDiskDeleteOption string = 'Delete'
 param nicDeleteOption string = 'Delete'
 param virtualMachineSize string = 'Standard_D2s_v4'
 
-var vnetId = virtualNetworkId
-//var vnetName = last(split(vnetId, '/'))
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+var vnetIdSplit = split(virtualNetworkId, '/')
+var vnetResourceGroupName = vnetIdSplit[4]
+var vnetName = last(vnetIdSplit)
+
+resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: vnetResourceGroupName
+  scope: subscription()
+}
+
+resource vnet 'Microsoft.Network/virtualNetworks@2022-05-01' existing = {
+  name: vnetName
+  scope: vnetResourceGroup
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2022-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
 
 // TODO: Add random 3 digits at the end
 var networkInterfaceName = virtualMachineName
-
-// TODO: Add existing virtual network and subnet resources to use as references
 
 resource networkInterface 'Microsoft.Network/networkInterfaces@2021-03-01' = {
   name: networkInterfaceName
@@ -34,7 +47,7 @@ resource networkInterface 'Microsoft.Network/networkInterfaces@2021-03-01' = {
         name: 'ipconfig1'
         properties: {
           subnet: {
-            id: subnetRef
+            id: subnet.id
           }
           privateIPAllocationMethod: 'Dynamic'
         }
@@ -62,9 +75,9 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2022-03-01' = {
         deleteOption: osDiskDeleteOption
       }
       imageReference: {
-        publisher: 'MicrosoftWindowsDesktop'
-        offer: 'Windows-10'
-        sku: 'win10-21h2-avd-g2'
+        publisher: 'microsoftwindowsdesktop'
+        offer: 'office-365'
+        sku: 'win10-22h2-avd-m365-g2'
         version: 'latest'
       }
     }

@@ -14,7 +14,7 @@ Param(
 	[string]$WorkloadName = 'researchprj',
 	[int]$Sequence = 1,
 	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
-	[string]$VmNumber = "10",
+	[string]$VmNumber = "11",
 	[Parameter(Mandatory)]
 	[string]$ProjectSubscriptionId,
 	[Parameter(Mandatory)]

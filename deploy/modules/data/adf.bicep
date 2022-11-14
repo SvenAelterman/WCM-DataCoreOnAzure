@@ -58,12 +58,14 @@ module stopTriggersDeploymentScriptModule 'deploymentScript.bicep' = {
 }
 
 resource managedVnet 'Microsoft.DataFactory/factories/managedVirtualNetworks@2018-06-01' = {
-  name: '${adf.name}/${managedVnetName}'
+  name: managedVnetName
+  parent: adf
   properties: {}
 }
 
 resource integrationRuntime 'Microsoft.DataFactory/factories/integrationRuntimes@2018-06-01' = {
-  name: '${adf.name}/${autoResolveIntegrationRuntimeName}'
+  name: autoResolveIntegrationRuntimeName
+  parent: adf
   dependsOn: [
     managedVnet
   ]
@@ -259,7 +261,8 @@ resource dfsDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = {
 }
 
 resource pipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01' = {
-  name: '${adf.name}/${pipelineName}'
+  name: pipelineName
+  parent: adf
   properties: {
     // The pipeline's activity definitions are stored in a JSON file to keep this file readable
     activities: [

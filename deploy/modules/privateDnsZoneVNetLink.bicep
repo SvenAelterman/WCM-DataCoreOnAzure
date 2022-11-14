@@ -1,6 +1,8 @@
 param vnetId string
 param dnsZoneName string
 
+param registrationEnabled bool = true
+
 resource dnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
   name: dnsZoneName
   scope: resourceGroup()
@@ -14,6 +16,6 @@ resource vnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2018-09
     virtualNetwork: {
       id: vnetId
     }
-    registrationEnabled: false
+    registrationEnabled: registrationEnabled
   }
 }

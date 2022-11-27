@@ -1,7 +1,7 @@
 param vnetId string
 param dnsZoneName string
 
-param registrationEnabled bool = true
+param registrationEnabled bool = false
 
 resource dnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
   name: dnsZoneName

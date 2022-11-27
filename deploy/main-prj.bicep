@@ -189,6 +189,7 @@ module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (su
   params: {
     dnsZoneName: privateDnsZones[i].name
     vnetId: vNetModule.outputs.vNetId
+    registrationEnabled: false
   }
 }]
 

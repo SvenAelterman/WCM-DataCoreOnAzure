@@ -42,7 +42,7 @@ var storageAccountSubResourcePrivateEndpoints = [
 var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
-var dataNamingStructure = replace(namingStructure, '{subwloadname}', 'data')
+var airlockNamingStructure = replace(namingStructure, '{subwloadname}', 'airlock')
 
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
@@ -57,8 +57,8 @@ resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 }
 
 // Contains the storage account for reviewing export requests
-resource dataHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: replace(dataNamingStructure, '{rtype}', 'rg')
+resource airlockHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: replace(airlockNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
@@ -140,6 +140,7 @@ module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (su
   params: {
     dnsZoneName: privateDnsZones[i].outputs.zoneName
     vnetId: hubVnetModule.outputs.vNetId
+    registrationEnabled: false
   }
   dependsOn: [
     privateDnsZones[i]
@@ -185,40 +186,22 @@ module computeGalleryModule 'modules/gal.bicep' = {
   }
 }
 
-// Create name for the storage account used to hold data while being reviewed
-module reviewStorageAccountName 'common-modules/shortname.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'stname')
-  scope: dataHubResourceGroup
+module airlockModule 'modules/airlock.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'airlock')
+  scope: airlockHubResourceGroup
   params: {
+    location: location
     environment: environment
-    location: location
-    namingConvention: replace(namingConvention, '{subwloadname}', 'd')
-    resourceType: 'st'
-    sequence: sequence
+    deploymentNameStructure: deploymentNameStructure
+    namingConvention: namingConvention
     workloadName: workloadName
-    removeHyphens: true
-  }
-}
-
-module reviewStorageModule 'modules/data/storage.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'st')
-  scope: dataHubResourceGroup
-  params: {
-    containerNames: [
-      // TODO: no hardcoding here
-      'export-requested'
-      'export-approved'
-    ]
-    location: location
-    namingStructure: dataNamingStructure
-    privatize: true
-    storageAccountName: reviewStorageAccountName.outputs.shortName
-    subnetId: hubVnetModule.outputs.subnetIds[2]
-    subwloadname: 'data'
-    privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
-      subResourceName: subresource
-      dnsZoneId: privateDnsZones[i].outputs.zoneId
-      dnsZoneName: privateDnsZones[i].outputs.zoneName
+    airlockNamingStructure: airlockNamingStructure
+    sequence: sequence
+    storageAccountSubResourcePrivateEndpoints: storageAccountSubResourcePrivateEndpoints
+    dataSubnetId: hubVnetModule.outputs.subnetIds[2]
+    privateDnsZones: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+      zoneId: privateDnsZones[i].outputs.zoneId
+      zoneName: privateDnsZones[i].outputs.zoneName
     }]
   }
 }

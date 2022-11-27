@@ -294,3 +294,5 @@ module azureFirewallModule 'modules/azfw.bicep' = {
 
 output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: storagePrivateDnsZonesModule[i].outputs.zoneId]
 output airlockVmName string = airlockModule.outputs.vmName
+output airlockStorageAccountName string = airlockModule.outputs.storageAccountName
+output airlockResourceGroupName string = airlockHubResourceGroup.name

@@ -54,8 +54,33 @@ $DeploymentResult
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AFTER ACTIONS
-	# - Assign access to AVD application group + Virtual Machine User Login
-	Write-Host "🔥 Hub Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
+
+	# JOIN AIRLOCK STORAGE ACCOUNT TO AAD FOR AUTH
+	# Extract output values from the DeploymentResult
+	[string]$storageAccountName = $DeploymentResult.Outputs.airlockStorageAccountName.Value
+	[string]$airlockResourceGroupName = $DeploymentResult.Outputs.airlockResourceGroupName.Value
+
+	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $HubSubscriptionId, $airlockResourceGroupName, $storageAccountName);
+
+	Write-Host $storageAccountName ", " $airlockResourceGroupName ", " $tenantId ", " $HubSubscriptionId "," $Uri
+
+	$json = @{properties = @{azureFilesIdentityBasedAuthentication = @{directoryServiceOptions = "AADKERB" } } };
+	$json = $json | ConvertTo-Json -Depth 99
+
+	$token = $(Get-AzAccessToken).Token
+	$headers = @{ Authorization = "Bearer $token" }
+
+	try {
+		Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
+		New-AzStorageAccountKey -ResourceGroupName $airlockResourceGroupName -Name $storageAccountName -KeyName kerb1 -ErrorAction Stop
+
+		Get-AzADServicePrincipal -Searchstring "[Storage Account] $storageAccountName.file.core.windows.net"
+		Write-Host "🔥 Hub Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
+	}
+	catch {
+		Write-Host $_.Exception.ToString()
+		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
+	}
 }
 
 # TODO: Domain-join hub (review) private storage account

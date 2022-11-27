@@ -62,9 +62,9 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AAD-join private storage account
 	# LATER: Extract this into a separate module (we'll need it for the hub too)
 
-	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $subscriptionId, $dataResourceGroupName, $privateStorageAccountName);
+	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $ProjectSubscriptionId, $dataResourceGroupName, $privateStorageAccountName);
 
-	Write-Host $privateStorageAccountName ", " $dataResourceGroupName ", " $tenantId ", " $subscriptionId "," $Uri
+	Write-Host $privateStorageAccountName ", " $dataResourceGroupName ", " $tenantId ", " $ProjectSubscriptionId "," $Uri
 
 	$json = @{properties = @{azureFilesIdentityBasedAuthentication = @{directoryServiceOptions = "AADKERB" } } };
 	$json = $json | ConvertTo-Json -Depth 99
@@ -76,7 +76,7 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
 		New-AzStorageAccountKey -ResourceGroupName $dataResourceGroupName -Name $privateStorageAccountName -KeyName kerb1 -ErrorAction Stop
 
-		# TODO: Use dynamic determination of FQDN for storage account
+		# LATER: Use dynamic determination of FQDN for storage account
 		# $storageAccountEndpoint = $AzContext | `
 		# Select-Object -ExpandProperty Environment | `
 		# Select-Object -ExpandProperty StorageEndpointSuffix
@@ -89,5 +89,5 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
 	}
 	
-	# TODO: set file share (Az RBAC) permissions on share
+	# TODO: Set file share (Az RBAC) permissions on share
 }

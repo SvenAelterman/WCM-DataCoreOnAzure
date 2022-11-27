@@ -21,7 +21,7 @@ param storageAccountSubResourcePrivateEndpoints array = [
 param tags object = {}
 
 // Create name for the storage account used to hold data while being reviewed
-module reviewStorageAccountName '../common-modules/shortname.bicep' = {
+module reviewStorageAccountNameModule '../common-modules/shortname.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'stname')
   params: {
     environment: environment
@@ -47,7 +47,7 @@ module reviewStorageModule 'data/storage.bicep' = {
     location: location
     namingStructure: airlockNamingStructure
     privatize: true
-    storageAccountName: reviewStorageAccountName.outputs.shortName
+    storageAccountName: reviewStorageAccountNameModule.outputs.shortName
     subnetId: dataSubnetId
     subwloadname: 'data'
     privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
@@ -72,6 +72,7 @@ module airlockVmModule 'vm-research.bicep' = {
   }
 }
 
-// TODO: Deploy RBAC to allow admins to sign into airlock VM
+// TODO: Deploy RBAC for storage account (data admins)
 
+output storageAccountName string = reviewStorageModule.outputs.storageAccountName
 output vmName string = airlockVmModule.outputs.vmName

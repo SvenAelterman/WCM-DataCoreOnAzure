@@ -27,6 +27,10 @@ param subnetAddressSpace string = '10.${vnetOctet2}.{octet3}.0/24'
 param hubSubscriptionId string
 param hubWorkloadName string
 
+// LATER: Deploy research VM in this spoke if true
+#disable-next-line no-unused-params
+param deployResearchVm bool = false
+
 // Optional parameters
 param tags object = {}
 param sequence int = 1

@@ -16,6 +16,13 @@ param osDiskDeleteOption string = 'Delete'
 param nicDeleteOption string = 'Delete'
 param virtualMachineSize string = 'Standard_D2s_v4'
 
+param imageReference object = {
+  publisher: 'microsoftwindowsdesktop'
+  offer: 'office-365'
+  sku: 'win10-22h2-avd-m365-g2'
+  version: 'latest'
+}
+
 var vnetIdSplit = split(virtualNetworkId, '/')
 var vnetResourceGroupName = vnetIdSplit[4]
 var vnetName = last(vnetIdSplit)
@@ -74,12 +81,7 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2022-03-01' = {
         }
         deleteOption: osDiskDeleteOption
       }
-      imageReference: {
-        publisher: 'microsoftwindowsdesktop'
-        offer: 'office-365'
-        sku: 'win10-22h2-avd-m365-g2'
-        version: 'latest'
-      }
+      imageReference: imageReference
     }
     networkProfile: {
       networkInterfaces: [
@@ -127,3 +129,6 @@ resource aadLoginExtension 'Microsoft.Compute/virtualMachines/extensions@2022-08
     }
   }
 }
+
+output vmName string = virtualMachine.name
+output nicName string = networkInterfaceName

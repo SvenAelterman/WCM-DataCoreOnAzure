@@ -14,24 +14,30 @@ Param(
 	[string]$WorkloadName = 'researchhub',
 	[int]$Sequence = 1,
 	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
-	[string]$computeDnsSuffix = 'research.aelterman.info',
+	[string]$ComputeDnsSuffix,
+	[securestring]$AirlockVmLocalAdminPassword,
 	[Parameter(Mandatory)]
 	[string]$HubSubscriptionId,
 	[Parameter(Mandatory)]
-	[string]$TenantId
+	[string]$TenantId,
+	[string]$AadSysAdminGroupObjectId,
+	[string]$AadDataAdminGroupObjectId
 )
 
 $TemplateParameters = @{
 	# REQUIRED
-	location         = $Location
-	environment      = $Environment
-	workloadName     = $WorkloadName
-	computeDnsSuffix = $computeDnsSuffix
+	location                    = $Location
+	environment                 = $Environment
+	workloadName                = $WorkloadName
+	computeDnsSuffix            = $ComputeDnsSuffix
+	airlockVmLocalAdminPassword = $AirlockVmLocalAdminPassword
+	aadSysAdminGroupObjectId    = $AadSysAdminGroupObjectId
+	aadDataAdminGroupObjectId   = $AadDataAdminGroupObjectId
 
 	# OPTIONAL
-	sequence         = $Sequence
-	namingConvention = $NamingConvention
-	tags             = @{
+	sequence                    = $Sequence
+	namingConvention            = $NamingConvention
+	tags                        = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
 		lifetime       = 'medium'
@@ -52,4 +58,4 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	Write-Host "🔥 Hub Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
 }
 
-# TODO: Domain-join hub (review) private storage accounts
+# TODO: Domain-join hub (review) private storage account

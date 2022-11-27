@@ -12,10 +12,16 @@ param location string
 ])
 param environment string
 param workloadName string
+@secure()
+param airlockVmLocalAdminPassword string
 
-// TODO: Create private DNS zone with this name
-#disable-next-line no-unused-params
+// Create private DNS zone with this name
 param computeDnsSuffix string
+
+// The AAD Object IDs of the user groups representing the different roles of the data core
+// Required to complete role assignments
+param aadSysAdminGroupObjectId string
+param aadDataAdminGroupObjectId string
 
 param vnetAddressSpace string = '10.19.0.0/16'
 param subnetAddressSpace string = '10.19.{octet3}.0/24'
@@ -44,6 +50,18 @@ var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
 var airlockNamingStructure = replace(namingStructure, '{subwloadname}', 'airlock')
 
+// REFERENCE MODULES
+module rolesModule 'common-modules/roles.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'roles')
+  scope: coreHubResourceGroup
+}
+
+module abbreviationsModule 'common-modules/abbreviations.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'abbrev')
+  scope: coreHubResourceGroup
+}
+// END REFERENCE MODULES
+
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
   location: location
@@ -63,14 +81,26 @@ resource airlockHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01'
   tags: tags
 }
 
-module rolesModule 'common-modules/roles.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'roles')
-  scope: coreHubResourceGroup
+// Enable sysadmins to log on to all VMs in the subscription
+resource subscriptionLoginRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(aadDataAdminGroupObjectId, subscription().id, '1c0163c0-47e6-4577-8991-ea5c82e286e4')
+  properties: {
+    principalId: aadSysAdminGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles['Virtual Machine Administrator Login']
+    principalType: 'Group'
+    description: 'Enables Data Core Sysadmins to log in as administrators to all VMs in the subscription.'
+  }
 }
 
-module abbreviationsModule 'common-modules/abbreviations.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'abbrev')
-  scope: coreHubResourceGroup
+// Enable data admins to log on to Airlock VMs
+module airlockLoginRbacModule 'modules/resourceGroupRbac.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'rbac-airlock-login')
+  scope: airlockHubResourceGroup
+  params: {
+    principalId: aadDataAdminGroupObjectId
+    principalType: 'Group'
+    roleDefinitionId: rolesModule.outputs.roles['Virtual Machine User Login']
+  }
 }
 
 var vnetAbbrev = abbreviationsModule.outputs.abbreviations['Virtual Network']
@@ -91,6 +121,13 @@ var hubVNetSubnets = [
   {
     name: 'data'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '2')
+    nsgId: ''
+    routeTableId: ''
+  }
+  {
+    name: 'airlock-compute'
+    addressPrefix: replace(subnetAddressSpace, '{octet3}', '3')
+    // TODO: Apply NSG, route table to airlock-compute subnet?
     nsgId: ''
     routeTableId: ''
   }
@@ -126,7 +163,7 @@ module hubVnetModule 'modules/vnet.bicep' = {
   }
 }
 
-module privateDnsZones 'modules/privateDnsZone.bicep' = [for subresource in storageAccountSubResourcePrivateEndpoints: {
+module storagePrivateDnsZonesModule 'modules/privateDnsZone.bicep' = [for subresource in storageAccountSubResourcePrivateEndpoints: {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-${subresource}')
   scope: coreHubResourceGroup
   params: {
@@ -134,18 +171,39 @@ module privateDnsZones 'modules/privateDnsZone.bicep' = [for subresource in stor
   }
 }]
 
-module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+module storagePrivateDnsZoneVNetLinksModule 'modules/privateDnsZoneVNetLink.bicep' = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-link-${subresource}')
   scope: coreHubResourceGroup
   params: {
-    dnsZoneName: privateDnsZones[i].outputs.zoneName
+    dnsZoneName: storagePrivateDnsZonesModule[i].outputs.zoneName
     vnetId: hubVnetModule.outputs.vNetId
     registrationEnabled: false
   }
   dependsOn: [
-    privateDnsZones[i]
+    storagePrivateDnsZonesModule[i]
   ]
 }]
+
+module computePrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-compute')
+  scope: coreHubResourceGroup
+  params: {
+    zoneName: computeDnsSuffix
+  }
+}
+
+module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-compute')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: computePrivateDnsZoneModule.outputs.zoneName
+    vnetId: hubVnetModule.outputs.vNetId
+    registrationEnabled: true
+  }
+  dependsOn: [
+    computePrivateDnsZoneModule
+  ]
+}
 
 module logModule 'modules/log.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'log')
@@ -200,9 +258,14 @@ module airlockModule 'modules/airlock.bicep' = {
     storageAccountSubResourcePrivateEndpoints: storageAccountSubResourcePrivateEndpoints
     dataSubnetId: hubVnetModule.outputs.subnetIds[2]
     privateDnsZones: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
-      zoneId: privateDnsZones[i].outputs.zoneId
-      zoneName: privateDnsZones[i].outputs.zoneName
+      zoneId: storagePrivateDnsZonesModule[i].outputs.zoneId
+      zoneName: storagePrivateDnsZonesModule[i].outputs.zoneName
     }]
+    vmLocalAdminPassword: airlockVmLocalAdminPassword
+    sequenceFormatted: sequenceFormatted
+    vmSubnetName: hubVNetSubnets[3].name
+    vmVnetId: hubVnetModule.outputs.vNetId
+    tags: tags
   }
 }
 
@@ -212,7 +275,7 @@ module bastionModule 'modules/bastion.bicep' = if (deployBastionHost) {
   params: {
     namingStructure: coreNamingStructure
     location: location
-    bastionSubnetId: hubVnetModule.outputs.subnetIds[5]
+    bastionSubnetId: hubVnetModule.outputs.subnetIds[6]
     tags: tags
   }
 }
@@ -221,12 +284,13 @@ module azureFirewallModule 'modules/azfw.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'fw')
   scope: coreHubResourceGroup
   params: {
-    firewallSubnetId: hubVnetModule.outputs.subnetIds[3]
-    fwManagementSubnetId: hubVnetModule.outputs.subnetIds[4]
+    firewallSubnetId: hubVnetModule.outputs.subnetIds[4]
+    fwManagementSubnetId: hubVnetModule.outputs.subnetIds[5]
     location: location
     namingStructure: coreNamingStructure
     tags: tags
   }
 }
 
-output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: privateDnsZones[i].outputs.zoneId]
+output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: storagePrivateDnsZonesModule[i].outputs.zoneId]
+output airlockVmName string = airlockModule.outputs.vmName

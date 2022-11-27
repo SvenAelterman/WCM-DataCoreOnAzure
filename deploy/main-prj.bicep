@@ -361,6 +361,8 @@ module ipGroupModule 'modules/ipGroup.bicep' = {
 
 // TODO: Add firewall rules based on ipGroup
 
+// TODO: Link VNet to compute DNS
+
 output vnetAddressSpace array = vNetModule.outputs.vNetAddressSpace
 output privateStorageAccountName string = privateStorageAccountShortname.outputs.shortName
 output publicStorageAccountName string = publicStorageAccountShortname.outputs.shortName

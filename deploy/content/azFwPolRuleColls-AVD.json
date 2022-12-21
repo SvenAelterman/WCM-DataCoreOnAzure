@@ -1,0 +1,54 @@
+[
+	{
+		"ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+		"action": {
+			"type": "Allow"
+		},
+		"rules": [
+			{
+				"ruleType": "ApplicationRule",
+				"name": "DSC_artifacts",
+				"protocols": [
+					{
+						"protocolType": "Http",
+						"port": 80
+					},
+					{
+						"protocolType": "Https",
+						"port": 443
+					}
+				],
+				"targetFqdns": [
+					"wvdportalstorageblob.blob.core.windows.net"
+				],
+				"terminateTLS": false,
+				"sourceAddresses": [
+					"*"
+				]
+			},
+			{
+				"ruleType": "ApplicationRule",
+				"name": "AVD_tag",
+				"protocols": [
+					{
+						"protocolType": "Http",
+						"port": 80
+					},
+					{
+						"protocolType": "Https",
+						"port": 443
+					}
+				],
+				"fqdnTags": [
+					"WindowsVirtualDesktop"
+				],
+				"terminateTLS": false,
+				"sourceAddresses": [
+					"*"
+				]
+			}
+		],
+		"name": "AVD_Deployment",
+		"priority": 300
+	}
+]

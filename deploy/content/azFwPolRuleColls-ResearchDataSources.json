@@ -1,0 +1,11 @@
+[
+	{
+		"ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+		"action": {
+			"type": "Allow"
+		},
+		"rules": [],
+		"name": "TestSites_App",
+		"priority": 100
+	}
+]

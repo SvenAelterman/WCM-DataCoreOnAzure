@@ -1,0 +1,38 @@
+[
+	{
+		"ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+		"action": {
+			"type": "Deny"
+		},
+		"rules": [
+			{
+				"ruleType": "ApplicationRule",
+				"name": "WVD",
+				"protocols": [
+					{
+						"protocolType": "Http",
+						"port": 80
+					},
+					{
+						"protocolType": "Https",
+						"port": 443
+					}
+				],
+				"fqdnTags": [],
+				"webCategories": [],
+				"targetFqdns": [
+					"client.wvd.microsoft.com"
+				],
+				"targetUrls": [],
+				"terminateTLS": false,
+				"sourceAddresses": [
+					"*"
+				],
+				"destinationAddresses": [],
+				"sourceIpGroups": []
+			}
+		],
+		"name": "Block_WVDWeb",
+		"priority": 100
+	}
+]

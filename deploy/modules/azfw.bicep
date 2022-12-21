@@ -32,25 +32,55 @@ resource firewallPublicIp2 'Microsoft.Network/publicIPAddresses@2022-01-01' = {
   tags: tags
 }
 
+param firewallTier string = 'Basic'
+
 // Create standard firewall policy
 resource firewallPolicy 'Microsoft.Network/firewallPolicies@2022-01-01' = {
   name: replace(namingStructure, '{rtype}', 'fwpol')
   location: location
   properties: {
     sku: {
-      tier: 'Basic'
+      tier: firewallTier
     }
   }
   tags: tags
 }
 
-//resource intuneFirewallRule 'Microsoft.Network/firewallPolicies/ruleCollectionGroups@2022-01-01' = {
-//  name: ''
-//  parent: firewallPolicy
-//  properties: {
-//    priority: 100
-//  }
-//}
+var ruleCollectionGroups = {
+  AVD: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-AVD.json')
+    priority: 500
+  }
+  AzurePlatform: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-AzurePlatform.json')
+    priority: 1000
+  }
+  AVDRDWeb: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-AVDRDWeb.json')
+    priority: 100
+  }
+  ManagedDevices: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-ManagedDevices.json')
+    priority: 300
+  }
+  Office365Activation: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-Office365Activation.json')
+    priority: 700
+  }
+  ResearchDataSources: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-ResearchDataSources.json')
+    priority: 600
+  }
+}
+
+resource avdRuleCollectionGroups 'Microsoft.Network/firewallPolicies/ruleCollectionGroups@2022-07-01' = [for (group, i) in items(ruleCollectionGroups): {
+  name: group.key
+  parent: firewallPolicy
+  properties: {
+    priority: group.value.priority
+    ruleCollections: group.value.rules
+  }
+}]
 
 // Create Azure Firewall Basic SKU
 resource firewall 'Microsoft.Network/azureFirewalls@2022-01-01' = {
@@ -87,9 +117,10 @@ resource firewall 'Microsoft.Network/azureFirewalls@2022-01-01' = {
     }
     sku: {
       name: 'AZFW_VNet'
-      tier: 'Basic'
+      tier: firewallTier
     }
   }
+  tags: tags
 }
 
 output fwPrIp string = firewall.properties.ipConfigurations[0].properties.privateIPAddress

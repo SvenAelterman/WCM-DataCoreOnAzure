@@ -11,4 +11,6 @@ resource privateEndpoint 'Microsoft.DataFactory/factories/managedVirtualNetworks
   }
 }
 
+// TODO: Support for file private endpoint (parameter, airlock only needs file) => groupIds [] param
+
 output privateEndpointId string = privateEndpoint.properties.privateLinkResourceId

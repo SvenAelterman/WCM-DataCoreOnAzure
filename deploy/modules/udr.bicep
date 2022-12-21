@@ -38,13 +38,13 @@ resource routeToDefenderForCloud 'Microsoft.Network/routeTables/routes@2022-01-0
   }
 }
 
-resource routeToAVD 'Microsoft.Network/routeTables/routes@2022-01-01' = {
-  name: 'AzureVirtualDesktop'
-  parent: udr
-  properties: {
-    nextHopType: 'Internet'
-    addressPrefix: 'WindowsVirtualDesktop'
-  }
-}
+// resource routeToAVD 'Microsoft.Network/routeTables/routes@2022-01-01' = {
+//   name: 'AzureVirtualDesktop'
+//   parent: udr
+//   properties: {
+//     nextHopType: 'Internet'
+//     addressPrefix: 'WindowsVirtualDesktop'
+//   }
+// }
 
 output routeTableId string = udr.id

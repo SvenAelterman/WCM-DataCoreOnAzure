@@ -1,5 +1,5 @@
 /*
- * Creates a short name for the given structure and values that is no longer than the maximum specified length
+ * Creates a short name for the given structure and input that is no longer than the maximum specified length
  * How this is shorter than the standard naming convention
  * - Saves usually 1 character on the sequence (01 vs. 1)
  * - Saves a few characters in the location name (eastus vs. eus)

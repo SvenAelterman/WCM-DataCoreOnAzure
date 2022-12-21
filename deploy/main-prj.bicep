@@ -13,7 +13,9 @@ param location string
 param environment string
 param workloadName string
 @maxLength(10)
-param shortWorkloadName string = take(workloadName, 10)
+param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
+param computeDnsSuffix string
+param dataExportApproverEmail string
 
 // Provide reasonable defaults for octet 2 of the VNet address space.
 // If the address space parameters are specified, this won't be used.
@@ -26,6 +28,9 @@ param subnetAddressSpace string = '10.${vnetOctet2}.{octet3}.0/24'
 
 param hubSubscriptionId string
 param hubWorkloadName string
+// Default the short workload name (for name of KV): remove all vowels
+@maxLength(10)
+param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 
 // LATER: Deploy research VM in this spoke if true
 #disable-next-line no-unused-params
@@ -41,7 +46,7 @@ param deploymentTime string = utcNow()
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
-var deploymentNameStructure = '${workloadName}-${environment}-{rtype}-${deploymentTime}'
+var deploymentNameStructure = '${workloadName}-${toLower(environment)}-{rtype}-${deploymentTime}'
 
 var storageAccountSubResourcePrivateEndpoints = [
   'blob'
@@ -49,31 +54,47 @@ var storageAccountSubResourcePrivateEndpoints = [
   'dfs'
 ]
 
+var subWorkloadNames = {
+  core: 'core'
+  data: 'data'
+  compute: 'compute'
+  hubAirlock: 'airlock'
+  hubCore: 'core'
+}
+
+// shortCoreNamingConvention is used by the shortname modules for key vault 
+// LATER: Storage account names should use short naming convention
+var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', take(subWorkloadNames.core, 1))
+
 // Naming structure only needs the resource type ({rtype}) replaced
 var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
-// shortCoreNamingConvention is used by the shortname modules for storage accounts and key vault
-var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', 'c')
-var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'core')
-var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'data')
-var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', 'compute')
+var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.core)
+var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.data)
+var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.compute)
 
 // Names of hub resources [The hub is deployed from main-hub.bicep before deploying project resources.]
 var hubSequenceFormatted = format('{0:00}', hubSequence)
 var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
+var hubAirlockNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'airlock')
 var hubVNetName = replace(hubCoreNamingStructure, '{rtype}', 'vnet')
 var hubFwName = replace(hubCoreNamingStructure, '{rtype}', 'fw')
 
+// TODO: Load from JSON to share with hub
 var containerNames = {
+  // In the public storage account
   exportApproved: 'export-approved'
   ingest: 'ingest'
-  exportPending: 'export-pending'
+  //exportPending: 'export-pending'
+  // In the private storage account
   exportRequest: 'export-request'
 }
 
 var fileShareNames = {
   projectShared: 'shared'
+  airlock: 'export-pendingreview'
 }
 
+// Define three resource groups for the project's Azure resources
 resource corePrjResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
   location: location
@@ -92,6 +113,7 @@ resource computeResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = 
   tags: tags
 }
 
+// Get a reference to the hub's core resource group
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: replace(hubCoreNamingStructure, '{rtype}', 'rg')
   scope: subscription(hubSubscriptionId)
@@ -109,8 +131,6 @@ resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
   name: hubVNetName
   scope: coreHubResourceGroup
 }
-
-// TODO: Link with auto-registration Enabled to hub's 'research.aelterman.info' private DNS zone
 
 // The existing Private DNS zones for the storage account sub-resources
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing = [for subresource in storageAccountSubResourcePrivateEndpoints: {
@@ -188,7 +208,7 @@ module privateDnsZoneVNetLinks 'modules/privateDnsZoneVNetLink.bicep' = [for (su
   scope: coreHubResourceGroup
   params: {
     dnsZoneName: privateDnsZones[i].name
-    vnetId: vNetModule.outputs.vNetId
+    vNetId: vNetModule.outputs.vNetId
     registrationEnabled: false
   }
 }]
@@ -241,7 +261,7 @@ module privateStorageAccountShortname 'common-modules/shortname.bicep' = {
 
 // Create the research project's primary private storage account
 module privateStorageAccountModule 'modules/data/storage.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'data')
+  name: replace(deploymentNameStructure, '{rtype}', 'st')
   scope: dataPrjResourceGroup
   params: {
     namingStructure: coreNamingStructure
@@ -264,8 +284,7 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
   }
 }
 
-// Assume that each project will be able to benefit from a Key Vault instance.
-// This is required for the data automation module.
+// Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
 module keyVaultShortNameModule 'common-modules/shortname.bicep' = {
   name: 'keyVaultShortName'
@@ -324,25 +343,72 @@ module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
+// Reference the existing hub's airlock resource group
+resource airlockRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: replace(hubAirlockNamingStructure, '{rtype}', 'rg')
+  scope: subscription(hubSubscriptionId)
+}
+
+// Recreate the name of the hub's airlock storage account
+module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'stname')
+  scope: airlockRg
+  params: {
+    environment: environment
+    location: location
+    //namingConvention: replace(namingConvention, '{subwloadname}', 'a')
+    namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubAirlock, 1))
+    resourceType: 'st'
+    sequence: sequence
+    workloadName: hubWorkloadName
+    removeHyphens: true
+  }
+}
+
+// Get the name of the hub's Key Vault
+module hubKeyVaultShortNameModule 'common-modules/shortname.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'kv-shortname')
+  scope: coreHubResourceGroup
+  params: {
+    location: location
+    environment: environment
+    namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubCore, 1))
+    resourceType: 'kv'
+    sequence: hubSequence
+    workloadName: shortHubWorkloadName
+  }
+}
+
+// Deploy the data movement automation (ADF, logic app, etc.)
 module dataAutomationModule 'modules/data.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'data')
+  scope: dataPrjResourceGroup
   params: {
     location: location
     namingStructure: dataNamingStructure
     publicStNamingStructure: replace(thisNamingStructure, '{subwloadname}', 'pub')
     workspaceName: '${workloadName}${sequenceFormatted}'
     roles: rolesModule.outputs.roles
-    approverEmail: 'sven@aelterman.info'
+    approverEmail: dataExportApproverEmail
     deploymentNameStructure: deploymentNameStructure
-    privateStorageAccountRG: dataPrjResourceGroup.name
+    //privateStorageAccountRG: dataPrjResourceGroup.name
+    // Project's private storage account created earlier
     privateStorageAccountName: privateStorageAccountModule.outputs.storageAccountName
     containerNames: containerNames
-    projectFileShareName: fileShareNames.projectShared
+    //projectFileShareName: fileShareNames.projectShared
     tags: tags
+    // This storage account is created by the data module
     publicStorageAccountName: publicStorageAccountShortname.outputs.shortName
     keyVaultName: keyVaultModule.outputs.keyVaultName
     privateStorageAccountConnStringSecretName: privateStorageAccountConnStringSecretModule.outputs.secretName
     keyVaultResourceGroupName: corePrjResourceGroup.name
+    airlockFileShareName: fileShareNames.airlock
+    //airlockResourceGroupName: airlockRg.name
+    airlockStorageAccountName: airlockStorageAccountNameModule.outputs.shortName
+    //airlockSubscriptionId: hubSubscriptionId
+    hubSubscriptionId: hubSubscriptionId
+    hubKeyVaultName: hubKeyVaultShortNameModule.outputs.shortName
+    hubKeyVaultResourceGroupName: coreHubResourceGroup.name
   }
 }
 
@@ -359,9 +425,24 @@ module ipGroupModule 'modules/ipGroup.bicep' = {
   }
 }
 
-// TODO: Add firewall rules based on ipGroup
+// TODO: Add firewall rules to policy based on ipGroup
 
-// TODO: Link VNet to compute DNS
+resource computePrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: computeDnsSuffix
+  scope: coreHubResourceGroup
+}
+
+// Link the project virtual network to the hub's compute Private DNS Zone
+module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-compute')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: computePrivateDnsZone.name
+    vNetId: vNetModule.outputs.vNetId
+    // New NICs in the virtual network will register with DNS
+    registrationEnabled: true
+  }
+}
 
 output vnetAddressSpace array = vNetModule.outputs.vNetAddressSpace
 output privateStorageAccountName string = privateStorageAccountShortname.outputs.shortName

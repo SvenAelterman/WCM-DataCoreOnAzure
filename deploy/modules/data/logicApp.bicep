@@ -1,15 +1,26 @@
 param location string
 param namingStructure string
-param subwloadname string = ''
 param adfName string
-param storageAcctName string
+param prjStorageAcctName string
+param prjPublicStorageAcctName string
+param airlockStorageAcctName string
+param airlockFileShareName string
 param approverEmail string
+param sourceFolderPath string
+param sinkFolderPath string
+
+param subwloadname string = ''
 param tags object = {}
 
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
 
-resource storageAcct 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
-  name: storageAcctName
+// Project's private storage account
+resource prjStorageAcct 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: prjStorageAcctName
+}
+
+resource prjPublicStorageAcct 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: prjPublicStorageAcctName
 }
 
 resource adf 'Microsoft.DataFactory/factories@2018-06-01' existing = {
@@ -35,11 +46,11 @@ resource adfConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
 // As of 2022-10-23, Bicep does not have type info for this resource type
 #disable-next-line BCP081
 resource stgConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
-  name: 'api-${storageAcctName}'
+  name: 'api-${prjStorageAcctName}'
   location: location
   kind: 'V1'
   properties: {
-    displayName: storageAcctName
+    displayName: prjStorageAcctName
     api: {
       id: subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'azureblob')
     }
@@ -66,9 +77,8 @@ resource emailConnection 'Microsoft.Web/connections@2018-07-01-preview' = {
   tags: tags
 }
 
-// logic app
 resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
-  name: replace(baseName, '{rtype}', 'logicApp')
+  name: replace(baseName, '{rtype}', 'logic')
   location: location
   identity: {
     type: 'SystemAssigned'
@@ -114,33 +124,57 @@ resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
       dataFactoryName: {
         value: adf.name
       }
-      storageAccountName: {
-        value: storageAcctName
+      sourceStorageAccountName: {
+        value: prjStorageAcctName
       }
-      approverEmail: {
+      sourceFolderPath: {
+        value: sourceFolderPath
+      }
+      sinkStorageAccountName: {
+        value: airlockStorageAcctName
+      }
+      notificationEmail: {
         value: approverEmail
+      }
+      sinkFileShareName: {
+        value: airlockFileShareName
+      }
+      sinkFolderPath: {
+        value: sinkFolderPath
+      }
+      finalSinkStorageAccountName: {
+        value: prjPublicStorageAcctName
+      }
+      // TODO: Add parameters for pipeline names
+      // TODO: Add parameter for Key Vault URL (sinkConnStringKvBaseUrl)
+      // TODO: Add parameter for source container name (for trigger value)
+      exportApprovedContainerName: {
+        // TODO: Do not hardcode container name
+        value: 'export-approved'
       }
     }
   }
   tags: tags
 }
 
-// set rbac on adf for logicApp
+// Set RBAC on ADF for Logic App
 resource logicAppAdfRole 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
-  name: guid('rbac-${adf.name}-adf')
+  name: guid('rbac-${adf.name}-${logicApp.name}')
   scope: adf
   properties: {
+    // TODO: Use Roles module
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '673868aa-7521-48a0-acc6-0f60742d39f5')
     principalId: logicApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
-// set rbac on stg account for LogicApp
+// Set RBAC on project Storage Account for Logic App
 resource logicAppPrivateStgRole 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = {
-  name: guid('rbac-${storageAcct.name}-logicapp')
-  scope: storageAcct
+  name: guid('rbac-${prjStorageAcct.name}-${logicApp.name}')
+  scope: prjStorageAcct
   properties: {
+    // TODO: Use Roles module
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
     principalId: logicApp.identity.principalId
     principalType: 'ServicePrincipal'

@@ -1,14 +1,19 @@
 param storageAccountId string
 param sinkStorageAccountName string
+param sinkFileShareName string
 param sourceStorageAccountName string
 param adfName string
 param ingestPipelineName string
 param workspaceName string
 @allowed([
   'Public'
-  'Private'
+  // 'Private'
+  // 'Airlock'
 ])
 param storageAccountType string
+param additionalSinkFolderPath string
+param sinkConnStringKvBaseUrl string
+
 param containerName string = ''
 
 resource trigger 'Microsoft.DataFactory/factories/triggers@2018-06-01' = {
@@ -36,7 +41,9 @@ resource trigger 'Microsoft.DataFactory/factories/triggers@2018-06-01' = {
           sinkStorageAccountName: sinkStorageAccountName
           fileName: '@triggerBody().fileName'
           sourceFolderPath: '@triggerBody().folderPath'
-          sinkFolderPath: '@triggerBody().folderPath'
+          sinkFolderPath: '${additionalSinkFolderPath}/@triggerBody().folderPath'
+          sinkFileShareName: sinkFileShareName
+          sinkConnStringKvBaseUrl: sinkConnStringKvBaseUrl
         }
       }
     ]

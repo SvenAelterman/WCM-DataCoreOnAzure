@@ -12,6 +12,9 @@ param location string
 ])
 param environment string
 param workloadName string
+// Default the short workload name (for name of KV): remove all vowels
+@maxLength(10)
+param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 @secure()
 param airlockVmLocalAdminPassword string
 
@@ -44,11 +47,17 @@ var storageAccountSubResourcePrivateEndpoints = [
   'dfs'
 ]
 
+var subWorkloadNames = {
+  core: 'core'
+  avd: 'avd'
+  airlock: 'airlock'
+}
+
 // Naming structure only needs the resource type ({rtype}) replaced
 var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
-var coreNamingStructure = replace(namingStructure, '{subwloadname}', 'core')
-var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
-var airlockNamingStructure = replace(namingStructure, '{subwloadname}', 'airlock')
+var coreNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.core)
+var avdNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.avd)
+var airlockNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.airlock)
 
 // REFERENCE MODULES
 module rolesModule 'common-modules/roles.bicep' = {
@@ -62,6 +71,7 @@ module abbreviationsModule 'common-modules/abbreviations.bicep' = {
 }
 // END REFERENCE MODULES
 
+// Create three resource groups for the hub Azure resources
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
   location: location
@@ -163,6 +173,7 @@ module hubVnetModule 'modules/vnet.bicep' = {
   }
 }
 
+// Create Azure Private DNS Zones for each private endpoint namespace for storage accounts
 module storagePrivateDnsZonesModule 'modules/privateDnsZone.bicep' = [for subresource in storageAccountSubResourcePrivateEndpoints: {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-${subresource}')
   scope: coreHubResourceGroup
@@ -171,12 +182,13 @@ module storagePrivateDnsZonesModule 'modules/privateDnsZone.bicep' = [for subres
   }
 }]
 
+// Link each Private DNS Zone to the hub virtual network
 module storagePrivateDnsZoneVNetLinksModule 'modules/privateDnsZoneVNetLink.bicep' = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-link-${subresource}')
   scope: coreHubResourceGroup
   params: {
     dnsZoneName: storagePrivateDnsZonesModule[i].outputs.zoneName
-    vnetId: hubVnetModule.outputs.vNetId
+    vNetId: hubVnetModule.outputs.vNetId
     registrationEnabled: false
   }
   dependsOn: [
@@ -184,6 +196,7 @@ module storagePrivateDnsZoneVNetLinksModule 'modules/privateDnsZoneVNetLink.bice
   ]
 }]
 
+// Create a Private DNS Zone for the computer objects
 module computePrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-compute')
   scope: coreHubResourceGroup
@@ -192,12 +205,14 @@ module computePrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
   }
 }
 
+// Link the compute Private DNS Zone to the hub virtual network
 module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-link-compute')
   scope: coreHubResourceGroup
   params: {
     dnsZoneName: computePrivateDnsZoneModule.outputs.zoneName
-    vnetId: hubVnetModule.outputs.vNetId
+    vNetId: hubVnetModule.outputs.vNetId
+    // New NICs in the virtual network will register with DNS
     registrationEnabled: true
   }
   dependsOn: [
@@ -215,6 +230,7 @@ module logModule 'modules/log.bicep' = {
   }
 }
 
+// Create the Azure Virtual Desktop infrastructure
 module hubAvdModule 'modules/avd.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'avd')
   dependsOn: [
@@ -244,6 +260,7 @@ module computeGalleryModule 'modules/gal.bicep' = {
   }
 }
 
+// Create the airlock resources: storage account, private endpoints, VM
 module airlockModule 'modules/airlock.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'airlock')
   scope: airlockHubResourceGroup
@@ -256,19 +273,55 @@ module airlockModule 'modules/airlock.bicep' = {
     airlockNamingStructure: airlockNamingStructure
     sequence: sequence
     storageAccountSubResourcePrivateEndpoints: storageAccountSubResourcePrivateEndpoints
+    // LATER: Do not rely on index to find the correct subnet
     dataSubnetId: hubVnetModule.outputs.subnetIds[2]
+    vmSubnetName: hubVNetSubnets[3].name
     privateDnsZones: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
       zoneId: storagePrivateDnsZonesModule[i].outputs.zoneId
       zoneName: storagePrivateDnsZonesModule[i].outputs.zoneName
     }]
     vmLocalAdminPassword: airlockVmLocalAdminPassword
     sequenceFormatted: sequenceFormatted
-    vmSubnetName: hubVNetSubnets[3].name
     vmVnetId: hubVnetModule.outputs.vNetId
     tags: tags
   }
 }
 
+// Deploy a Key Vault in the hub, to store the airlock storage connection string
+module keyVaultShortNameModule 'common-modules/shortname.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'kv-shortname')
+  scope: coreHubResourceGroup
+  params: {
+    location: location
+    environment: environment
+    // The shortname module doesn't deal with sub-workloads like this project does
+    namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.core, 1))
+    resourceType: 'kv'
+    sequence: sequence
+    workloadName: shortWorkloadName
+  }
+}
+
+module keyVaultModule 'modules/keyVault.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'kv')
+  scope: coreHubResourceGroup
+  params: {
+    location: location
+    keyVaultName: keyVaultShortNameModule.outputs.shortName
+  }
+}
+
+module storageConnStringSecretModule 'modules/keyVault-StorageAccountConnString.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'kv-secret')
+  params: {
+    keyVaultName: keyVaultModule.outputs.keyVaultName
+    keyVaultResourceGroupName: coreHubResourceGroup.name
+    storageAccountName: airlockModule.outputs.storageAccountName
+    storageAccountResourceGroupName: airlockHubResourceGroup.name
+  }
+}
+
+// If desired, deploy Bastion to manage VMs
 module bastionModule 'modules/bastion.bicep' = if (deployBastionHost) {
   name: replace(deploymentNameStructure, '{rtype}', 'bas')
   scope: coreHubResourceGroup
@@ -280,6 +333,7 @@ module bastionModule 'modules/bastion.bicep' = if (deployBastionHost) {
   }
 }
 
+// Deploy Azure Firewall
 module azureFirewallModule 'modules/azfw.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'fw')
   scope: coreHubResourceGroup
@@ -296,3 +350,5 @@ output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResou
 output airlockVmName string = airlockModule.outputs.vmName
 output airlockStorageAccountName string = airlockModule.outputs.storageAccountName
 output airlockResourceGroupName string = airlockHubResourceGroup.name
+output kvName string = keyVaultShortNameModule.outputs.shortName
+output shortWorkloadName string = shortWorkloadName

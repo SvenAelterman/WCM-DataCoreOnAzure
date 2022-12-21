@@ -21,23 +21,29 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$HubSubscriptionId,
 	[Parameter(Mandatory)]
-	[string]$TenantId
+	[string]$TenantId,
+	[Parameter(Mandatory)]
+	[string]$ComputeDnsSuffix,
+	[Parameter(Mandatory)]
+	[string]$DataExportApproverEmail
 )
 
 $TemplateParameters = @{
 	# REQUIRED
-	location          = $Location
-	environment       = $Environment
-	workloadName      = $WorkloadName
+	location                = $Location
+	environment             = $Environment
+	workloadName            = $WorkloadName
+	computeDnsSuffix        = $ComputeDnsSuffix
+	dataExportApproverEmail = $DataExportApproverEmail
 
 	# OPTIONAL
-	shortWorkloadName = $ShortWorkloadName
-	hubSubscriptionId = $HubSubscriptionId
-	hubWorkloadName   = 'researchhub'
-	sequence          = $Sequence
-	hubSequence       = 1
-	namingConvention  = $NamingConvention
-	tags              = @{
+	shortWorkloadName       = $ShortWorkloadName
+	hubSubscriptionId       = $HubSubscriptionId
+	hubWorkloadName         = 'researchhub'
+	sequence                = $Sequence
+	hubSequence             = 1
+	namingConvention        = $NamingConvention
+	tags                    = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
 		lifetime       = 'medium'
@@ -54,17 +60,17 @@ $DeploymentResult
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# Extract output values from the DeploymentResult
-	[string]$privateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
-	[string]$dataResourceGroupName = $DeploymentResult.Outputs.dataResourceGroupName.Value
+	[string]$PrivateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
+	[string]$DataResourceGroupName = $DeploymentResult.Outputs.dataResourceGroupName.Value
 
 	$AzContext = Get-AzContext
 
 	# AAD-join private storage account
 	# LATER: Extract this into a separate module (we'll need it for the hub too)
 
-	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $ProjectSubscriptionId, $dataResourceGroupName, $privateStorageAccountName);
+	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $ProjectSubscriptionId, $DataResourceGroupName, $PrivateStorageAccountName);
 
-	Write-Host $privateStorageAccountName ", " $dataResourceGroupName ", " $tenantId ", " $ProjectSubscriptionId "," $Uri
+	Write-Host $PrivateStorageAccountName ", " $DataResourceGroupName ", " $tenantId ", " $ProjectSubscriptionId "," $Uri
 
 	$json = @{properties = @{azureFilesIdentityBasedAuthentication = @{directoryServiceOptions = "AADKERB" } } };
 	$json = $json | ConvertTo-Json -Depth 99
@@ -74,13 +80,13 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 
 	try {
 		Invoke-RestMethod -Uri $Uri -ContentType 'application/json' -Method PATCH -Headers $Headers -Body $json;
-		New-AzStorageAccountKey -ResourceGroupName $dataResourceGroupName -Name $privateStorageAccountName -KeyName kerb1 -ErrorAction Stop
+		New-AzStorageAccountKey -ResourceGroupName $DataResourceGroupName -Name $PrivateStorageAccountName -KeyName kerb1 -ErrorAction Stop
 
 		# LATER: Use dynamic determination of FQDN for storage account
 		# $storageAccountEndpoint = $AzContext | `
 		# Select-Object -ExpandProperty Environment | `
 		# Select-Object -ExpandProperty StorageEndpointSuffix
-		Get-AzADServicePrincipal -Searchstring "[Storage Account] $privateStorageAccountName.file.core.windows.net"
+		Get-AzADServicePrincipal -Searchstring "[Storage Account] $PrivateStorageAccountName.file.core.windows.net"
 
 		Write-Host "🔥 Project Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
 	}
@@ -89,5 +95,9 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
 	}
 	
+	# TODO: Grant admin consent for new App representing the Az File share?
+	
 	# TODO: Set file share (Az RBAC) permissions on share
+
+	# TODO: Set blob RBAC permission on export-request container
 }

@@ -13,6 +13,7 @@ param vmLocalAdminPassword string
 param vmSubnetName string
 param vmVnetId string
 
+param vmNamePrefix string = 'vm-airlock'
 param storageAccountSubResourcePrivateEndpoints array = [
   'blob'
   'file'
@@ -21,33 +22,32 @@ param storageAccountSubResourcePrivateEndpoints array = [
 param tags object = {}
 
 // Create name for the storage account used to hold data while being reviewed
-module reviewStorageAccountNameModule '../common-modules/shortname.bicep' = {
+module airlockStorageAccountNameModule '../common-modules/shortname.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'stname')
   params: {
     environment: environment
     location: location
-    namingConvention: replace(namingConvention, '{subwloadname}', 'd')
+    // TODO: Do not hardcode short value of airlock subworkloadname
+    namingConvention: replace(namingConvention, '{subwloadname}', 'a')
     resourceType: 'st'
     sequence: sequence
+    // TODO: Use short name of workload?
     workloadName: workloadName
     removeHyphens: true
   }
 }
 
-module reviewStorageModule 'data/storage.bicep' = {
+module airlockStorageModule 'data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'st')
   params: {
-    containerNames: [
-      // TODO: no hardcoding names here
-      'export-approved'
-    ]
+    containerNames: []
     fileShareNames: [
       'export-pendingreview'
     ]
     location: location
     namingStructure: airlockNamingStructure
     privatize: true
-    storageAccountName: reviewStorageAccountNameModule.outputs.shortName
+    storageAccountName: airlockStorageAccountNameModule.outputs.shortName
     subnetId: dataSubnetId
     subwloadname: 'data'
     privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
@@ -59,6 +59,8 @@ module reviewStorageModule 'data/storage.bicep' = {
   }
 }
 
+// TODO: Create entry in hub Key Vault for connection string
+
 module airlockVmModule 'vm-research.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'airlockvm')
   params: {
@@ -66,7 +68,7 @@ module airlockVmModule 'vm-research.bicep' = {
     adminPassword: vmLocalAdminPassword
     adminUsername: 'AzureUser'
     subnetName: vmSubnetName
-    virtualMachineName: 'hub-airlock${sequenceFormatted}'
+    virtualMachineName: '${vmNamePrefix}-${sequenceFormatted}'
     virtualNetworkId: vmVnetId
     tags: tags
   }
@@ -74,5 +76,5 @@ module airlockVmModule 'vm-research.bicep' = {
 
 // TODO: Deploy RBAC for storage account (data admins)
 
-output storageAccountName string = reviewStorageModule.outputs.storageAccountName
+output storageAccountName string = airlockStorageModule.outputs.storageAccountName
 output vmName string = airlockVmModule.outputs.vmName

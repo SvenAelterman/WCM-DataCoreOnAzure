@@ -13,7 +13,7 @@ Param(
 	[string]$Environment = 'Demo',
 	[string]$WorkloadName = 'researchhub',
 	[int]$Sequence = 1,
-	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
+	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
 	[string]$ComputeDnsSuffix,
 	[securestring]$AirlockVmLocalAdminPassword,
 	[Parameter(Mandatory)]
@@ -75,6 +75,9 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		New-AzStorageAccountKey -ResourceGroupName $airlockResourceGroupName -Name $storageAccountName -KeyName kerb1 -ErrorAction Stop
 
 		Get-AzADServicePrincipal -Searchstring "[Storage Account] $storageAccountName.file.core.windows.net"
+
+		# TODO: Grant admin consent for new App representing the Az File share?
+
 		Write-Host "🔥 Hub Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
 	}
 	catch {

@@ -5,18 +5,19 @@ param deploymentNameStructure string
 param subwloadname string = ''
 param privateStorageAcctName string
 param userAssignedIdentityId string
-@description('Name of the Azure Files share where incoming data should be delivered')
-param fileShareName string
+// @description('Name of the Azure Files share where incoming data should be delivered')
+// param fileShareName string
 param privateStorageAccountConnStringSecretName string
 param keyVaultName string
 param keyVaultResourceGroupName string
 
 // Optional parameters
-@description('Name of the folder in the Azure file share to deliver incoming data')
-param incomingFolderName string = 'incoming'
+// @description('Name of the folder in the Azure file share to deliver incoming data')
+// param incomingFolderName string = 'incoming'
 
 param tags object = {}
 param pipelineName string = 'pipe-data_move'
+param pipelineNameFilesToAdls string = 'pipe-data_move-files_to_adls'
 
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
 var managedVnetName = 'default'
@@ -110,7 +111,12 @@ resource keyVaultLinkedService 'Microsoft.DataFactory/factories/linkedservices@2
   properties: {
     type: 'AzureKeyVault'
     typeProperties: {
-      baseUrl: keyVault.properties.vaultUri
+      baseUrl: '@{linkedService.baseUrl}'
+    }
+    parameters: {
+      baseUrl: {
+        type: 'String'
+      }
     }
   }
 }
@@ -155,6 +161,12 @@ resource genericLinkedServiceAzFiles 'Microsoft.DataFactory/factories/linkedserv
         store: {
           referenceName: kvLinkedServiceName
           type: 'LinkedServiceReference'
+          parameters: {
+            baseUrl: {
+              type: 'Expression'
+              value: '@linkedService().kvBaseUrl'
+            }
+          }
         }
         secretName: {
           type: 'Expression'
@@ -168,7 +180,10 @@ resource genericLinkedServiceAzFiles 'Microsoft.DataFactory/factories/linkedserv
       }
       fileShareName: {
         type: 'String'
-        defaultValue: fileShareName
+        //defaultValue: fileShareName
+      }
+      kvBaseUrl: {
+        type: 'String'
       }
     }
     connectVia: {
@@ -191,13 +206,24 @@ resource AzFilesDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = 
           type: 'Expression'
           value: '@dataset().storageAccountName'
         }
+        fileShareName: {
+          type: 'Expression'
+          value: '@dataset().fileShareName'
+        }
+        kvBaseUrl: {
+          type: 'Expression'
+          value: '@dataset().connStringKvBaseUrl'
+        }
       }
     }
     type: 'Binary'
     typeProperties: {
       location: {
         type: 'AzureFileStorageLocation'
-        folderPath: incomingFolderName
+        folderPath: {
+          type: 'Expression'
+          value: '@dataset().folderPath'
+        }
         fileName: {
           type: 'Expression'
           value: '@dataset().fileName'
@@ -209,6 +235,15 @@ resource AzFilesDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = 
         type: 'String'
       }
       storageAccountName: {
+        type: 'String'
+      }
+      folderPath: {
+        type: 'String'
+      }
+      fileShareName: {
+        type: 'String'
+      }
+      connStringKvBaseUrl: {
         type: 'String'
       }
     }
@@ -265,9 +300,7 @@ resource pipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01' = {
   parent: adf
   properties: {
     // The pipeline's activity definitions are stored in a JSON file to keep this file readable
-    activities: [
-      json(loadTextContent('../../content/adfPipeline.json'))
-    ]
+    activities: loadJsonContent('../../content/adfPipeline.json')
     parameters: {
       sourceStorageAccountName: {
         type: 'String'
@@ -284,9 +317,51 @@ resource pipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01' = {
       fileName: {
         type: 'String'
       }
+      sinkFileShareName: {
+        type: 'String'
+      }
+      sinkConnStringKvBaseUrl: {
+        type: 'String'
+      }
     }
   }
   dependsOn: [
+    dfsDataset
+    AzFilesDataset
+  ]
+}
+
+resource pipelineFilesToAdls 'Microsoft.DataFactory/factories/pipelines@2018-06-01' = {
+  name: pipelineNameFilesToAdls
+  parent: adf
+  properties: {
+    activities: loadJsonContent('../../content/adfPipeline-Files2ADLS.json')
+    parameters: {
+      sourceStorageAccountName: {
+        type: 'String'
+      }
+      sinkStorageAccountName: {
+        type: 'String'
+      }
+      sourceFolderPath: {
+        type: 'String'
+      }
+      sinkFolderPath: {
+        type: 'String'
+      }
+      fileName: {
+        type: 'String'
+      }
+      sourceFileShareName: {
+        type: 'String'
+      }
+      sourceConnStringKvBaseUrl: {
+        type: 'String'
+      }
+    }
+  }
+  dependsOn: [
+    AzFilesDataset
     dfsDataset
   ]
 }
@@ -306,6 +381,10 @@ resource adfPrivateStgRole 'Microsoft.Authorization/roleAssignments@2020-10-01-p
   }
 }
 
+// TODO: Grant the ADF the Key Vault Secrets User on the airlock Key Vault and the project Key Vault
+
 output principalId string = adf.identity.principalId
 output name string = adf.name
+// TODO: Rename output pipeline name
 output pipelineName string = pipelineName
+output pipelineNameFilesToAdls string = pipelineNameFilesToAdls

@@ -1,12 +1,226 @@
 {
 	"$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+	"actions": {
+		"Initialize_pipelineStatus_variable": {
+			"inputs": {
+				"variables": [
+					{
+						"name": "pipelineStatus",
+						"type": "String",
+						"value": "Queued"
+					}
+				]
+			},
+			"runAfter": {
+				"Move_file_from_private_ADLS_to_Airlock_File_Share": [
+					"Succeeded"
+				]
+			},
+			"type": "InitializeVariable"
+		},
+		"Move_file_from_private_ADLS_to_Airlock_File_Share": {
+			"inputs": {
+				"body": {
+					"fileName": "@triggerBody()?['Name']",
+					"sinkConnStringKvBaseUrl": "https://kv-rsrchhb-c-d-eus2-1.vault.azure.net/",
+					"sinkFileShareName": "@parameters('sinkFileShareName')",
+					"sinkFolderPath": "@parameters('sinkFolderPath')",
+					"sinkStorageAccountName": "@parameters('sinkStorageAccountName')",
+					"sourceFolderPath": "@parameters('sourceFolderPath')",
+					"sourceStorageAccountName": "@parameters('sourceStorageAccountName')"
+				},
+				"host": {
+					"connection": {
+						"name": "@parameters('$connections')['azuredatafactory']['connectionId']"
+					}
+				},
+				"method": "post",
+				"path": "/subscriptions/@{parameters('subscriptionId')}/resourcegroups/@{parameters('dataFactoryRG')}/providers/Microsoft.DataFactory/factories/@{parameters('dataFactoryName')}/pipelines/@{encodeURIComponent('pipe-data_move')}/CreateRun",
+				"queries": {
+					"x-ms-api-version": "2017-09-01-preview"
+				}
+			},
+			"runAfter": {},
+			"type": "ApiConnection"
+		},
+		"Pipeline_successful": {
+			"actions": {
+				"Export_approved": {
+					"actions": {
+						"Move_file_from_Airlock_File_Share_to_public_ADLS": {
+							"inputs": {
+								"body": {
+									"fileName": "@triggerBody()?['Name']",
+									"sinkFolderPath": "@parameters('exportApprovedContainerName')",
+									"sinkStorageAccountName": "@parameters('finalSinkStorageAccountName')",
+									"sourceConnStringKvBaseUrl": "https://kv-rsrchhb-c-d-eus2-1.vault.azure.net/",
+									"sourceFileShareName": "@parameters('sinkFileShareName')",
+									"sourceFolderPath": "@parameters('sinkFolderPath')",
+									"sourceStorageAccountName": "@parameters('sinkStorageAccountName')"
+								},
+								"host": {
+									"connection": {
+										"name": "@parameters('$connections')['azuredatafactory']['connectionId']"
+									}
+								},
+								"method": "post",
+								"path": "/subscriptions/@{encodeURIComponent(parameters('subscriptionId'))}/resourcegroups/@{encodeURIComponent(parameters('dataFactoryRG'))}/providers/Microsoft.DataFactory/factories/@{encodeURIComponent(parameters('dataFactoryName'))}/pipelines/@{encodeURIComponent('pipe-data_move-files_to_adls')}/CreateRun",
+								"queries": {
+									"x-ms-api-version": "2017-09-01-preview"
+								}
+							},
+							"runAfter": {},
+							"type": "ApiConnection"
+						}
+					},
+					"expression": {
+						"and": [
+							{
+								"equals": [
+									"@body('Send_approval_email')?['SelectedOption']",
+									"Approve"
+								]
+							}
+						]
+					},
+					"runAfter": {
+						"Send_approval_email": [
+							"Succeeded"
+						]
+					},
+					"type": "If"
+				},
+				"Send_approval_email": {
+					"inputs": {
+						"body": {
+							"Message": {
+								"Body": "A new request for export has been received.\n\nFile: @{parameters('sinkFolderPath')}/@{triggerBody()?['Name']}",
+								"HideHTMLMessage": false,
+								"Importance": "Normal",
+								"Options": "Approve, Reject",
+								"ShowHTMLConfirmationDialog": false,
+								"Subject": "WCM Data Core on Azure - Data Export Request",
+								"To": "@parameters('notificationEmail')"
+							},
+							"NotificationUrl": "@{listCallbackUrl()}"
+						},
+						"host": {
+							"connection": {
+								"name": "@parameters('$connections')['office365']['connectionId']"
+							}
+						},
+						"path": "/approvalmail/$subscriptions"
+					},
+					"runAfter": {},
+					"type": "ApiConnectionWebhook"
+				}
+			},
+			"else": {
+				"actions": {
+					"Send_an_email_(V2)": {
+						"inputs": {
+							"body": {
+								"Body": "<p>Pipeline run failed</p>",
+								"Importance": "Normal",
+								"Subject": "WCM Data Core on Azure - Pipeline Failed",
+								"To": "@parameters('notificationEmail')"
+							},
+							"host": {
+								"connection": {
+									"name": "@parameters('$connections')['office365']['connectionId']"
+								}
+							},
+							"method": "post",
+							"path": "/v2/Mail"
+						},
+						"runAfter": {},
+						"type": "ApiConnection"
+					}
+				}
+			},
+			"expression": {
+				"and": [
+					{
+						"equals": [
+							"@body('Get_a_pipeline_run')?['status']",
+							"Succeeded"
+						]
+					}
+				]
+			},
+			"runAfter": {
+				"Until_pipeline_is_finished": [
+					"Succeeded"
+				]
+			},
+			"type": "If"
+		},
+		"Until_pipeline_is_finished": {
+			"actions": {
+				"Delay": {
+					"inputs": {
+						"interval": {
+							"count": 1,
+							"unit": "Minute"
+						}
+					},
+					"runAfter": {},
+					"type": "Wait"
+				},
+				"Get_a_pipeline_run": {
+					"inputs": {
+						"host": {
+							"connection": {
+								"name": "@parameters('$connections')['azuredatafactory']['connectionId']"
+							}
+						},
+						"method": "get",
+						"path": "/subscriptions/@{encodeURIComponent(parameters('subscriptionId'))}/resourcegroups/@{encodeURIComponent(parameters('dataFactoryRG'))}/providers/Microsoft.DataFactory/factories/@{encodeURIComponent(parameters('dataFactoryName'))}/pipelineRuns/@{encodeURIComponent(body('Move_file_from_private_ADLS_to_Airlock_File_Share')?['runId'])}",
+						"queries": {
+							"x-ms-api-version": "2017-09-01-preview"
+						}
+					},
+					"runAfter": {
+						"Delay": [
+							"Succeeded"
+						]
+					},
+					"type": "ApiConnection"
+				},
+				"Set_variable": {
+					"inputs": {
+						"name": "pipelineStatus",
+						"value": "@body('Get_a_pipeline_run')?['status']"
+					},
+					"runAfter": {
+						"Get_a_pipeline_run": [
+							"Succeeded"
+						]
+					},
+					"type": "SetVariable"
+				}
+			},
+			"expression": "@and(not(equals(variables('pipelineStatus'), 'Queued')),not(equals(variables('pipelineStatus'), 'InProgress')))",
+			"limit": {
+				"count": 20,
+				"timeout": "PT1H"
+			},
+			"runAfter": {
+				"Initialize_pipelineStatus_variable": [
+					"Succeeded"
+				]
+			},
+			"type": "Until"
+		}
+	},
 	"contentVersion": "1.0.0.0",
+	"outputs": {},
 	"parameters": {
 		"$connections": {
 			"defaultValue": {},
 			"type": "Object"
 		},
-		"subscriptionId": {
+		"dataFactoryName": {
 			"defaultValue": "",
 			"type": "String"
 		},
@@ -14,15 +228,39 @@
 			"defaultValue": "",
 			"type": "String"
 		},
-		"dataFactoryName": {
+		"exportApprovedContainerName": {
+			"defaultValue": "export-approved",
+			"type": "String"
+		},
+		"finalSinkStorageAccountName": {
+			"defaultValue": "stresearchprjddeus21",
+			"type": "String"
+		},
+		"notificationEmail": {
 			"defaultValue": "",
 			"type": "String"
 		},
-		"storageAccountName": {
+		"sinkFileShareName": {
 			"defaultValue": "",
 			"type": "String"
 		},
-		"approverEmail": {
+		"sinkFolderPath": {
+			"defaultValue": "stresearchprjcdeus21",
+			"type": "String"
+		},
+		"sinkStorageAccountName": {
+			"defaultValue": "stresearchhubadeus21",
+			"type": "String"
+		},
+		"sourceFolderPath": {
+			"defaultValue": "",
+			"type": "String"
+		},
+		"sourceStorageAccountName": {
+			"defaultValue": "",
+			"type": "String"
+		},
+		"subscriptionId": {
 			"defaultValue": "",
 			"type": "String"
 		}
@@ -40,10 +278,10 @@
 					}
 				},
 				"method": "get",
-				"path": "/v2/datasets/@{parameters('storageAccountName')}/triggers/batch/onupdatedfile",
+				"path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent(parameters('sourceStorageAccountName')))}/triggers/batch/onupdatedfile",
 				"queries": {
 					"checkBothCreatedAndModifiedDateTime": false,
-					"folderId": "/export-pending",
+					"folderId": "/export-request",
 					"maxFileCount": 1
 				}
 			},
@@ -54,74 +292,5 @@
 			"splitOn": "@triggerBody()",
 			"type": "ApiConnection"
 		}
-	},
-	"actions": {
-		"Condition": {
-			"actions": {
-				"Create_a_pipeline_run": {
-					"inputs": {
-						"body": {
-							"fileName": "@triggerBody()?['Name']",
-							"sinkFolderPath": "export-approved",
-							"sinkStorageAccountName": "@parameters('storageAccountName')",
-							"sourceFolderPath": "export-pending",
-							"sourceStorageAccountName": "@parameters('storageAccountName')"
-						},
-						"host": {
-							"connection": {
-								"name": "@parameters('$connections')['azuredatafactory']['connectionId']"
-							}
-						},
-						"method": "post",
-						"path": "/subscriptions/@{parameters('subscriptionId')}/resourcegroups/@{parameters('dataFactoryRG')}/providers/Microsoft.DataFactory/factories/@{parameters('dataFactoryName')}/pipelines/@{encodeURIComponent('pipe-data_move')}/CreateRun",
-						"queries": {
-							"x-ms-api-version": "2017-09-01-preview"
-						}
-					},
-					"runAfter": {},
-					"type": "ApiConnection"
-				}
-			},
-			"expression": {
-				"and": [
-					{
-						"equals": [
-							"@body('Send_approval_email')?['SelectedOption']",
-							"Approve"
-						]
-					}
-				]
-			},
-			"runAfter": {
-				"Send_approval_email": [
-					"Succeeded"
-				]
-			},
-			"type": "If"
-		},
-		"Send_approval_email": {
-			"inputs": {
-				"body": {
-					"Message": {
-						"HideHTMLMessage": false,
-						"Importance": "Normal",
-						"Options": "Approve, Reject",
-						"ShowHTMLConfirmationDialog": false,
-						"Subject": "Approval Request",
-						"To": "@parameters('approverEmail')"
-					},
-					"NotificationUrl": "@{listCallbackUrl()}"
-				},
-				"host": {
-					"connection": {
-						"name": "@parameters('$connections')['office365']['connectionId']"
-					}
-				},
-				"path": "/approvalmail/$subscriptions"
-			},
-			"runAfter": {},
-			"type": "ApiConnectionWebhook"
-		}
-	},
-	"outputs": {}
+	}
 }

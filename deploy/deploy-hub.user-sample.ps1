@@ -15,7 +15,6 @@ $VmLocalCred = Get-Credential -Message 'Airlock VM local admin user name and pas
 [string]$AadDataAdminGroupObjectId = 'AAD GROUP OBJECT ID'
 [string]$AadSysAdminGroupObjectId = 'AAD GROUP OBJECT ID'
 
-# Sven's research hub sub (3)
 ./deploy-hub.ps1 -HubSubscriptionId $HubSubscriptionId -TenantId $TenantId `
 	-ComputeDnsSuffix $ComputeDnsSuffix -AirlockVmLocalAdminPassword $AirlockVmLocalAdminPassword `
 	-AadDataAdminGroupObjectId $AadDataAdminGroupObjectId  -AadSysAdminGroupObjectId $AadSysAdminGroupObjectId

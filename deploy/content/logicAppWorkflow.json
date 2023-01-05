@@ -99,7 +99,7 @@
 								"Importance": "Normal",
 								"Options": "Approve, Reject",
 								"ShowHTMLConfirmationDialog": false,
-								"Subject": "WCM Data Core on Azure - Data Export Request",
+								"Subject": "Data Export Request",
 								"To": "@parameters('notificationEmail')"
 							},
 							"NotificationUrl": "@{listCallbackUrl()}"
@@ -122,7 +122,7 @@
 							"body": {
 								"Body": "<p>Pipeline run failed</p>",
 								"Importance": "Normal",
-								"Subject": "WCM Data Core on Azure - Pipeline Failed",
+								"Subject": "Pipeline Failed",
 								"To": "@parameters('notificationEmail')"
 							},
 							"host": {

@@ -35,7 +35,6 @@ $TemplateParameters = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
 		lifetime       = 'medium'
-		'customer-ref' = 'WCM'
 	}
 }
 

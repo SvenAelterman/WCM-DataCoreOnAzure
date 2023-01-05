@@ -57,7 +57,6 @@ module adfModule 'data/adf.bicep' = {
     deploymentNameStructure: deploymentNameStructure
     privateStorageAcctName: privateStorageAccountName
     userAssignedIdentityId: uami.outputs.managedIdentityId
-    //fileShareName: projectFileShareName
     tags: tags
     keyVaultName: keyVaultName
     keyVaultResourceGroupName: keyVaultResourceGroupName

@@ -17,6 +17,8 @@ param shortWorkloadName string = take(replace(replace(replace(replace(replace(wo
 param computeDnsSuffix string
 param dataExportApproverEmail string
 
+param publicStorageAccountAllowedIPs array = []
+
 // Provide reasonable defaults for octet 2 of the VNet address space.
 // If the address space parameters are specified, this won't be used.
 param vnetOctet2Base int = 20
@@ -259,6 +261,12 @@ module privateStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
+var peInfo = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
+  subResourceName: subresource
+  dnsZoneId: privateDnsZones[i].id
+  dnsZoneName: privateDnsZones[i].name
+}]
+
 // Create the research project's primary private storage account
 module privateStorageAccountModule 'modules/data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'st')
@@ -276,11 +284,7 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
     fileShareNames: [
       fileShareNames.projectShared
     ]
-    privateEndpointInfo: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
-      subResourceName: subresource
-      dnsZoneId: privateDnsZones[i].id
-      dnsZoneName: privateDnsZones[i].name
-    }]
+    privateEndpointInfo: peInfo
   }
 }
 
@@ -409,6 +413,7 @@ module dataAutomationModule 'modules/data.bicep' = {
     hubSubscriptionId: hubSubscriptionId
     hubKeyVaultName: hubKeyVaultShortNameModule.outputs.shortName
     hubKeyVaultResourceGroupName: coreHubResourceGroup.name
+    publicStorageAccountAllowedIPs: publicStorageAccountAllowedIPs
   }
 }
 

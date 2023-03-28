@@ -41,7 +41,7 @@ resource trigger 'Microsoft.DataFactory/factories/triggers@2018-06-01' = {
           sinkStorageAccountName: sinkStorageAccountName
           fileName: '@triggerBody().fileName'
           sourceFolderPath: '@triggerBody().folderPath'
-          sinkFolderPath: '${additionalSinkFolderPath}/@triggerBody().folderPath'
+          sinkFolderPath: additionalSinkFolderPath
           sinkFileShareName: sinkFileShareName
           sinkConnStringKvBaseUrl: sinkConnStringKvBaseUrl
         }

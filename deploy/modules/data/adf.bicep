@@ -111,7 +111,7 @@ resource keyVaultLinkedService 'Microsoft.DataFactory/factories/linkedservices@2
   properties: {
     type: 'AzureKeyVault'
     typeProperties: {
-      baseUrl: '@{linkedService.baseUrl}'
+      baseUrl: '@{linkedService().baseUrl}'
     }
     parameters: {
       baseUrl: {
@@ -199,7 +199,7 @@ resource AzFilesDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = 
   parent: adf
   properties: {
     linkedServiceName: {
-      referenceName: azFilesLinkedServiceName
+      referenceName: genericLinkedServiceAzFiles.name
       type: 'LinkedServiceReference'
       parameters: {
         storageAccountName: {
@@ -256,7 +256,7 @@ resource dfsDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = {
   properties: {
     type: 'Binary'
     linkedServiceName: {
-      referenceName: adlsGen2LinkedServiceName
+      referenceName: genericLinkedServiceAdlsGen2.name
       type: 'LinkedServiceReference'
       parameters: {
         storageAccountName: {

@@ -7,12 +7,12 @@
 [CmdletBinding()]
 Param(
 	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus2',
+	[string]$Location = 'eastus',
 	# The environment descriptor
 	[ValidateSet('Test', 'Demo', 'Prod')]
 	[string]$Environment = 'Demo',
-	[string]$WorkloadName = 'researchhub',
-	[int]$Sequence = 1,
+	[string]$WorkloadName = 'wcmhub',
+	[int]$Sequence = 2,
 	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
 	[string]$ComputeDnsSuffix,
 	[securestring]$AirlockVmLocalAdminPassword,
@@ -50,8 +50,6 @@ Select-AzSubscription $HubSubscriptionId -Tenant $TenantId
 $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
 	-TemplateFile ".\main-hub.bicep" -TemplateParameterObject $TemplateParameters
 
-$DeploymentResult
-
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AFTER ACTIONS
 
@@ -85,5 +83,8 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
 	}
 }
+else {
+	$DeploymentResult
 
-# TODO: Domain-join hub (review) private storage account
+	Write-Error -Message "❌ Deployment failed 😢" -ErrorAction Stop
+}

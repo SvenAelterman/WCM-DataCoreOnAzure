@@ -73,7 +73,8 @@ var ruleCollectionGroups = {
   }
 }
 
-resource avdRuleCollectionGroups 'Microsoft.Network/firewallPolicies/ruleCollectionGroups@2022-07-01' = [for (group, i) in items(ruleCollectionGroups): {
+@batchSize(1)
+resource fwRuleCollectionGroups 'Microsoft.Network/firewallPolicies/ruleCollectionGroups@2022-07-01' = [for (group, i) in items(ruleCollectionGroups): {
   name: group.key
   parent: firewallPolicy
   properties: {
@@ -121,6 +122,9 @@ resource firewall 'Microsoft.Network/azureFirewalls@2022-01-01' = {
     }
   }
   tags: tags
+  dependsOn: [
+    fwRuleCollectionGroups
+  ]
 }
 
 output fwPrIp string = firewall.properties.ipConfigurations[0].properties.privateIPAddress

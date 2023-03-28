@@ -16,6 +16,7 @@ param airlockFileShareName string
 param hubKeyVaultName string
 param hubKeyVaultResourceGroupName string
 param hubSubscriptionId string
+param publicStorageAccountAllowedIPs array = []
 
 param tags object = {}
 
@@ -100,6 +101,7 @@ module publicStorageAccountModule 'data/storage.bicep' = {
       adfModule.outputs.principalId
     ]
     privatize: false
+    allowedIpAddresses: publicStorageAccountAllowedIPs
     tags: tags
   }
 }

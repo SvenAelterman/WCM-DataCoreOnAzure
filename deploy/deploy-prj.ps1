@@ -7,14 +7,14 @@
 [CmdletBinding()]
 Param(
 	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus2',
+	[string]$Location = 'eastus',
 	# The environment descriptor
 	[ValidateSet('Test', 'Demo', 'Prod')]
 	[string]$Environment = 'Demo',
-	[string]$WorkloadName = 'researchprj',
+	[string]$WorkloadName = 'wcmprj',
 	[ValidateLength(1, 10)]
-	[string]$ShortWorkloadName = 'rsrchprj',
-	[int]$Sequence = 1,
+	[string]$ShortWorkloadName = 'wcmprj',
+	[int]$Sequence = 2,
 	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
 	[Parameter(Mandatory)]
 	[string]$ProjectSubscriptionId,
@@ -25,25 +25,29 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$ComputeDnsSuffix,
 	[Parameter(Mandatory)]
-	[string]$DataExportApproverEmail
+	[string]$DataExportApproverEmail,
+
+	[array]$PublicStorageAccountAllowedIPs
 )
 
 $TemplateParameters = @{
 	# REQUIRED
-	location                = $Location
-	environment             = $Environment
-	workloadName            = $WorkloadName
-	computeDnsSuffix        = $ComputeDnsSuffix
-	dataExportApproverEmail = $DataExportApproverEmail
+	location                       = $Location
+	environment                    = $Environment
+	workloadName                   = $WorkloadName
+	computeDnsSuffix               = $ComputeDnsSuffix
+	dataExportApproverEmail        = $DataExportApproverEmail
+
+	publicStorageAccountAllowedIPs = $PublicStorageAccountAllowedIPs
 
 	# OPTIONAL
-	shortWorkloadName       = $ShortWorkloadName
-	hubSubscriptionId       = $HubSubscriptionId
-	hubWorkloadName         = 'researchhub'
-	sequence                = $Sequence
-	hubSequence             = 1
-	namingConvention        = $NamingConvention
-	tags                    = @{
+	shortWorkloadName              = $ShortWorkloadName
+	hubSubscriptionId              = $HubSubscriptionId
+	hubWorkloadName                = 'wcmhub'
+	sequence                       = $Sequence
+	hubSequence                    = 2
+	namingConvention               = $NamingConvention
+	tags                           = @{
 		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
 		purpose        = $Environment
 		lifetime       = 'medium'

@@ -2,15 +2,19 @@ param adfName string
 param privateStorageAccountId string
 param privateStorageAccountName string
 
-// TODO: Hardcoded managed VNet name ('default')
-resource privateEndpoint 'Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01' = {
-  name: '${adfName}/default/pe-${privateStorageAccountName}-dfs'
+var privateEndpointGroupIDs = [
+  'dfs'
+  'file'
+]
+
+// LATER: Hardcoded managed VNet name ('default')
+resource privateEndpoint 'Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01' = [for groupId in privateEndpointGroupIDs: {
+  name: '${adfName}/default/pe-${privateStorageAccountName}-${groupId}'
   properties: {
     privateLinkResourceId: privateStorageAccountId
-    groupId: 'dfs'
+    groupId: groupId
   }
-}
+}]
 
-// TODO: Support for file private endpoint (parameter, airlock only needs file) => groupIds [] param
-
-output privateEndpointId string = privateEndpoint.properties.privateLinkResourceId
+// VERIFY: Only need to put out a single private link resource because they all refer to the same storage account?
+output privateEndpointId string = privateEndpoint[0].properties.privateLinkResourceId

@@ -13,7 +13,7 @@ param deployVmsInSeparateRG bool = true
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
 var avdVmNamingStructure = replace(namingStructure, '{subwloadname}', deployVmsInSeparateRG ? 'avd-vm' : 'avd')
 
-resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2021-09-03-preview' = {
+resource hostPool 'Microsoft.DesktopVirtualization/hostPools@2019-12-10-preview' = {
   name: replace(avdNamingStructure, '{rtype}', abbreviations['AVD Host Pool'])
   location: location
   properties: {

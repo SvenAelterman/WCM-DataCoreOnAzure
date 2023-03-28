@@ -14,9 +14,24 @@ param subwloadname string = ''
 param skuName string = 'Standard_LRS'
 param principalIds array = []
 param tags object = {}
+param allowedIpAddresses array = []
 
 var assignRole = !empty(principalIds)
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
+
+var resourceAccessRules = !privatize ? [
+  // Allow access from any Data Factory in the same resource group
+  {
+    tenantId: subscription().tenantId
+    resourceId: resourceId(subscription().subscriptionId, resourceGroup().name, 'Microsoft.DataFactory/factories', '*')
+  }
+  // TODO: Add rule for EventGrid
+] : []
+
+var ipRules = [for ipAddress in allowedIpAddresses: {
+  value: ipAddress
+  action: 'Allow'
+}]
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
   name: storageAccountName
@@ -31,14 +46,21 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
     defaultToOAuthAuthentication: true
     allowBlobPublicAccess: false
     isHnsEnabled: true
+    // Completely disable the public endpoint if the storage account will use private endpoints only
     supportsHttpsTrafficOnly: true
     publicNetworkAccess: privatize ? 'Disabled' : 'Enabled'
     accessTier: 'Hot'
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: privatize ? 'Deny' : 'Allow' // force deny inbound traffic
-      ipRules: [] // Don't allow any IPs through the firewall
-      virtualNetworkRules: [] // Do not integrate via vnet due to service delegation requirements
+      // This controls the "Enabled from all networks" radio button for the public endpoint
+      // Deny all networks if account is private, has a list of allowed IPs, or has resource access rules
+      defaultAction: privatize || length(allowedIpAddresses) > 0 || length(resourceAccessRules) > 0 ? 'Deny' : 'Allow' // force deny inbound traffic
+      // Do not add public access point IP rules if the storage account must be private
+      ipRules: !privatize ? ipRules : []
+      // Do not integrate via vnet due to service delegation requirements
+      virtualNetworkRules: []
+      // Do not add resource access rules if the storage account must be private
+      resourceAccessRules: !privatize ? resourceAccessRules : []
     }
   }
   tags: tags

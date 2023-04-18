@@ -22,7 +22,7 @@
 			"inputs": {
 				"body": {
 					"fileName": "@triggerBody()?['Name']",
-					"sinkConnStringKvBaseUrl": "https://kv-rsrchhb-c-d-eus2-1.vault.azure.net/",
+					"sinkConnStringKvBaseUrl": "@parameters('airlockConnStringKvBaseUrl')",
 					"sinkFileShareName": "@parameters('sinkFileShareName')",
 					"sinkFolderPath": "@parameters('sinkFolderPath')",
 					"sinkStorageAccountName": "@parameters('sinkStorageAccountName')",
@@ -53,7 +53,7 @@
 									"fileName": "@triggerBody()?['Name']",
 									"sinkFolderPath": "@parameters('exportApprovedContainerName')",
 									"sinkStorageAccountName": "@parameters('finalSinkStorageAccountName')",
-									"sourceConnStringKvBaseUrl": "https://kv-rsrchhb-c-d-eus2-1.vault.azure.net/",
+									"sinkConnStringKvBaseUrl": "@parameters('airlockConnStringKvBaseUrl')",
 									"sourceFileShareName": "@parameters('sinkFileShareName')",
 									"sourceFolderPath": "@parameters('sinkFolderPath')",
 									"sourceStorageAccountName": "@parameters('sinkStorageAccountName')"
@@ -261,6 +261,10 @@
 			"type": "String"
 		},
 		"subscriptionId": {
+			"defaultValue": "",
+			"type": "String"
+		},
+		"airlockConnStringKvBaseUrl": {
 			"defaultValue": "",
 			"type": "String"
 		}

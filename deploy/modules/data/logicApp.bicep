@@ -8,6 +8,7 @@ param airlockFileShareName string
 param approverEmail string
 param sourceFolderPath string
 param sinkFolderPath string
+param hubCoreKeyVaultUri string
 
 param subwloadname string = ''
 param tags object = {}
@@ -19,9 +20,9 @@ resource prjStorageAcct 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
   name: prjStorageAcctName
 }
 
-resource prjPublicStorageAcct 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
-  name: prjPublicStorageAcctName
-}
+// resource prjPublicStorageAcct 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+//   name: prjPublicStorageAcctName
+// }
 
 resource adf 'Microsoft.DataFactory/factories@2018-06-01' existing = {
   name: adfName
@@ -146,7 +147,9 @@ resource logicApp 'Microsoft.Logic/workflows@2019-05-01' = {
         value: prjPublicStorageAcctName
       }
       // TODO: Add parameters for pipeline names
-      // TODO: Add parameter for Key Vault URL (sinkConnStringKvBaseUrl)
+      airlockConnStringKvBaseUrl: {
+        value: hubCoreKeyVaultUri
+      }
       // TODO: Add parameter for source container name (for trigger value)
       exportApprovedContainerName: {
         // TODO: Do not hardcode container name

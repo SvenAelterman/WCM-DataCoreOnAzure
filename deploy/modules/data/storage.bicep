@@ -25,8 +25,14 @@ var resourceAccessRules = !privatize ? [
     tenantId: subscription().tenantId
     resourceId: resourceId(subscription().subscriptionId, resourceGroup().name, 'Microsoft.DataFactory/factories', '*')
   }
-  // TODO: Add rule for EventGrid
-] : []
+  // TODO: Add rule for EventGrid?
+] : [
+  // Enclave (private) storage account needs to allow the Logic App access to trigger the workflow
+  {
+    tenantId: subscription().tenantId
+    resourceId: resourceId(subscription().subscriptionId, resourceGroup().name, 'Microsoft.Logic/workflows', '*')
+  }
+]
 
 var ipRules = [for ipAddress in allowedIpAddresses: {
   value: ipAddress
@@ -51,7 +57,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
     publicNetworkAccess: privatize ? 'Disabled' : 'Enabled'
     accessTier: 'Hot'
     networkAcls: {
-      bypass: 'AzureServices'
+      bypass: 'None'
       // This controls the "Enabled from all networks" radio button for the public endpoint
       // Deny all networks if account is private, has a list of allowed IPs, or has resource access rules
       defaultAction: privatize || length(allowedIpAddresses) > 0 || length(resourceAccessRules) > 0 ? 'Deny' : 'Allow' // force deny inbound traffic

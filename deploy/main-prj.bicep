@@ -32,7 +32,7 @@ param hubSubscriptionId string
 param hubWorkloadName string
 // Default the short workload name (for name of KV): remove all vowels
 @maxLength(10)
-param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
+param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(hubWorkloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 
 // LATER: Deploy research VM in this spoke if true
 #disable-next-line no-unused-params
@@ -44,6 +44,7 @@ param sequence int = 1
 param hubSequence int = 1
 // NOTE: Must be the same as the hub naming convention
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
+param hubNamingConvention string = namingConvention
 param deploymentTime string = utcNow()
 
 // Variables
@@ -376,7 +377,7 @@ module hubKeyVaultShortNameModule 'common-modules/shortname.bicep' = {
   params: {
     location: location
     environment: environment
-    namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubCore, 1))
+    namingConvention: replace(hubNamingConvention, '{subwloadname}', take(subWorkloadNames.hubCore, 1))
     resourceType: 'kv'
     sequence: hubSequence
     workloadName: shortHubWorkloadName

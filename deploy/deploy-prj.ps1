@@ -60,8 +60,6 @@ Select-AzSubscription $ProjectSubscriptionId -Tenant $TenantId
 $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
 	-TemplateFile ".\main-prj.bicep" -TemplateParameterObject $TemplateParameters
 
-$DeploymentResult
-
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# Extract output values from the DeploymentResult
 	[string]$PrivateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
@@ -95,13 +93,18 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Write-Host "🔥 Project Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
 	}
 	catch {
+		$DeploymentResult
+
 		Write-Host $_.Exception.ToString()
 		Write-Error -Message "Caught exception setting Storage Account directoryServiceOptions=AADKERB: $_" -ErrorAction Stop
 	}
 	
-	# TODO: Grant admin consent for new App representing the Az File share?
+	# TODO: Grant admin consent for new App representing the Az File share? + exclude from MFA CA
 	
 	# TODO: Set file share (Az RBAC) permissions on share
 
 	# TODO: Set blob RBAC permission on export-request container
+}
+else {
+	Write-Error -Message "❌ Project Deployment failed: $($DeploymentResult.ProvisioningState)" -ErrorAction Stop
 }

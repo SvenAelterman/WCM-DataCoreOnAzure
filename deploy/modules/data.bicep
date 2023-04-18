@@ -25,8 +25,6 @@ resource hubKvRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   scope: subscription(hubSubscriptionId)
 }
 
-// TODO: Disable linter until RBAC assigned
-#disable-next-line no-unused-existing-resources
 resource hubKv 'Microsoft.KeyVault/vaults@2022-07-01' existing = {
   name: hubKeyVaultName
   scope: hubKvRg
@@ -81,6 +79,7 @@ module logicAppModule 'data/logicApp.bicep' = {
     sinkFolderPath: privateStorageAccountName
     sourceFolderPath: containerNames.exportRequest
     prjPublicStorageAcctName: publicStorageAccountName
+    hubCoreKeyVaultUri: hubKv.properties.vaultUri
     tags: tags
   }
 }

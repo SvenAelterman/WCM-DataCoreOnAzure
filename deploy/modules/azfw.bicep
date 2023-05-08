@@ -64,7 +64,7 @@ var ruleCollectionGroups = {
     priority: 300
   }
   Office365Activation: {
-    rules: loadJsonContent('../content/azFwPolRuleColls-Office365Activation.json')
+    rules: loadJsonContent('../content/azFwPolRuleColls-Office365Activation.jsonc')
     priority: 700
   }
   ResearchDataSources: {

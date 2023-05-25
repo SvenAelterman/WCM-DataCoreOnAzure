@@ -65,11 +65,13 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	[string]$PrivateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
 	[string]$DataResourceGroupName = $DeploymentResult.Outputs.dataResourceGroupName.Value
 
-	$AzContext = Get-AzContext
+	#$AzContext = Get-AzContext
 
 	# AAD-join private storage account
-	# LATER: Extract this into a separate module (we'll need it for the hub too)
+	# LATER: Extract this into a separate module (we'll need it for the hub (airlock) too)
 
+	# TODO: Replace this with the Az cmdlets now available: https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-azure-active-directory-enable?tabs=azure-powershell#configure-the-clients-to-retrieve-kerberos-tickets
+	
 	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $ProjectSubscriptionId, $DataResourceGroupName, $PrivateStorageAccountName);
 
 	Write-Host $PrivateStorageAccountName ", " $DataResourceGroupName ", " $tenantId ", " $ProjectSubscriptionId "," $Uri
@@ -91,6 +93,8 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 		Get-AzADServicePrincipal -Searchstring "[Storage Account] $PrivateStorageAccountName.file.core.windows.net"
 
 		Write-Host "🔥 Project Deployment '$($DeploymentResult.DeploymentName)' successful 🙂"
+
+		# TODO: Add domain name and domain GUID to Azure AD Kerberos configuration of file shares
 	}
 	catch {
 		$DeploymentResult
@@ -103,7 +107,7 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	
 	# TODO: Set file share (Az RBAC) permissions on share
 
-	# TODO: Set blob RBAC permission on export-request container
+	# TODO: Set blob RBAC permission on export-request container (inside Bicep, see TODO in main-prj.bicep)
 }
 else {
 	Write-Error -Message "❌ Project Deployment failed: $($DeploymentResult.ProvisioningState)" -ErrorAction Stop

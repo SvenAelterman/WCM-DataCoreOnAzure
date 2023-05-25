@@ -289,6 +289,8 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
   }
 }
 
+// TODO: Assign permissions to file share and blob to specified group object IDs
+
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
 module keyVaultShortNameModule 'common-modules/shortname.bicep' = {

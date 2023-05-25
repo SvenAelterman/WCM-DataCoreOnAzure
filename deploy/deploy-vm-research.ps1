@@ -7,14 +7,14 @@
 [CmdletBinding()]
 Param(
 	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus2',
+	[string]$Location = 'eastus',
 	# The environment descriptor
 	[ValidateSet('Test', 'Demo', 'Prod')]
 	[string]$Environment = 'Demo',
-	[string]$WorkloadName = 'researchprj',
-	[int]$Sequence = 1,
+	[string]$WorkloadName = 'wcmprj',
+	[int]$Sequence = 2,
 	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
-	[string]$VmNumber = "11",
+	[string]$VmNumber = "1",
 	[Parameter(Mandatory)]
 	[string]$ProjectSubscriptionId,
 	[Parameter(Mandatory)]
@@ -27,7 +27,7 @@ $TemplateParameters = @{
 	# REQUIRED
 	location           = $Location
 	subnetName         = 'default'
-	virtualNetworkId   = '/subscriptions/1097603d-3720-4053-9380-a61b085faf5d/resourceGroups/rg-researchprj-core-demo-eastus2-01/providers/Microsoft.Network/virtualNetworks/vnet-researchprj-core-demo-eastus2-01'
+	virtualNetworkId   = '/subscriptions/2804b8a3-d41c-4603-815c-77d8813d196e/resourceGroups/rg-wcmprj-core-demo-eastus-02/providers/Microsoft.Network/virtualNetworks/vnet-wcmprj-core-demo-eastus-02'
 	virtualMachineName = "prj$($SequenceFormatted)-vm$($VmNumber)"
 	adminUsername      = 'AzureUser'
 	# OPTIONAL

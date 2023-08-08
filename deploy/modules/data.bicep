@@ -17,6 +17,7 @@ param hubKeyVaultName string
 param hubKeyVaultResourceGroupName string
 param hubSubscriptionId string
 param publicStorageAccountAllowedIPs array = []
+param projectMemberAadGroupObjectId string
 
 param tags object = {}
 
@@ -98,6 +99,7 @@ module publicStorageAccountModule 'data/storage.bicep' = {
     ]
     principalIds: [
       adfModule.outputs.principalId
+      projectMemberAadGroupObjectId
     ]
     privatize: false
     allowedIpAddresses: publicStorageAccountAllowedIPs

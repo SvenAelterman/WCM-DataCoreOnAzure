@@ -423,11 +423,9 @@ module dataAutomationModule 'modules/data.bicep' = {
     roles: rolesModule.outputs.roles
     approverEmail: dataExportApproverEmail
     deploymentNameStructure: deploymentNameStructure
-    //privateStorageAccountRG: dataPrjResourceGroup.name
     // Project's private storage account created earlier
     privateStorageAccountName: privateStorageAccountModule.outputs.storageAccountName
     containerNames: containerNames
-    //projectFileShareName: fileShareNames.projectShared
     tags: tags
     // This storage account is created by the data module
     publicStorageAccountName: publicStorageAccountShortname.outputs.shortName
@@ -435,13 +433,12 @@ module dataAutomationModule 'modules/data.bicep' = {
     privateStorageAccountConnStringSecretName: privateStorageAccountConnStringSecretModule.outputs.secretName
     keyVaultResourceGroupName: corePrjResourceGroup.name
     airlockFileShareName: fileShareNames.airlock
-    //airlockResourceGroupName: airlockRg.name
     airlockStorageAccountName: airlockStorageAccountNameModule.outputs.shortName
-    //airlockSubscriptionId: hubSubscriptionId
     hubSubscriptionId: hubSubscriptionId
     hubKeyVaultName: hubKeyVaultShortNameModule.outputs.shortName
     hubKeyVaultResourceGroupName: coreHubResourceGroup.name
     publicStorageAccountAllowedIPs: publicStorageAccountAllowedIPs
+    projectMemberAadGroupObjectId: projectMemberAadGroupObjectId
   }
 }
 

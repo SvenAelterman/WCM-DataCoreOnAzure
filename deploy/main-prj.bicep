@@ -17,6 +17,11 @@ param shortWorkloadName string = take(replace(replace(replace(replace(replace(wo
 param computeDnsSuffix string
 param dataExportApproverEmail string
 
+@description('Single project membership AAD group object ID.')
+param projectMemberAadGroupObjectId string
+@description('Array of objects containing individual user object IDs and UPNs. Schema: { upn: string, objectId: string }')
+param projectMemberObjectIds array
+
 param publicStorageAccountAllowedIPs array = []
 
 // Provide reasonable defaults for octet 2 of the VNet address space.
@@ -94,6 +99,8 @@ var containerNames = {
 
 var fileShareNames = {
   projectShared: 'shared'
+  projectIncoming: 'incoming'
+  projectPersonalPrefix: 'personal-'
   airlock: 'export-pendingreview'
 }
 
@@ -268,6 +275,22 @@ var peInfo = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints:
   dnsZoneName: privateDnsZones[i].name
 }]
 
+// Create file share names for the personal file shares: append the UPN while replacing invalid file share name characters
+var personalFileShares = [for member in projectMemberObjectIds: {
+  upn: member.upn
+  objectId: member.objectId
+  fileShareName: toLower('${fileShareNames.projectPersonalPrefix}${replace(replace(member.upn, '@', '-'), '.', '-')}')
+}]
+
+var personalFileShareNames = map(personalFileShares, pfs => pfs.fileShareName)
+
+var projectFileShareNames = [
+  fileShareNames.projectShared
+  fileShareNames.projectIncoming
+]
+
+var actualProjectFileShareNames = concat(personalFileShareNames, projectFileShareNames)
+
 // Create the research project's primary private storage account
 module privateStorageAccountModule 'modules/data/storage.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'st')
@@ -282,14 +305,15 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
     ]
     subnetId: vNetModule.outputs.subnetIds[1]
     tags: tags
-    fileShareNames: [
-      fileShareNames.projectShared
-    ]
+    fileShareNames: actualProjectFileShareNames
     privateEndpointInfo: peInfo
+
+    // Use the module to assign permissions to the blob storage
+    principalIds: [ projectMemberAadGroupObjectId ]
   }
 }
 
-// TODO: Assign permissions to file share and blob to specified group object IDs
+// TODO: Assign permissions to the file shares to specified group object IDs
 
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
@@ -357,6 +381,7 @@ resource airlockRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
 }
 
 // Recreate the name of the hub's airlock storage account
+// LATER: Have as parameter for input instead of recreating?
 module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'stname')
   scope: airlockRg

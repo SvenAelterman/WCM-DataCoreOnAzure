@@ -154,14 +154,16 @@ resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZ
   }
 }]
 
+var blobRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+
 // Assign Storage Blob data contrib to principalId if sent to this module
 resource rbacAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in principalIds: if (assignRole) {
-  name: guid('rbac-${storageAccount.name}-${i}')
+  name: guid(storageAccount.id, i, blobRoleDefinitionId)
   scope: storageAccount
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    roleDefinitionId: blobRoleDefinitionId
     principalId: i
-    principalType: 'ServicePrincipal'
+    //principalType: 'ServicePrincipal'
   }
 }]
 

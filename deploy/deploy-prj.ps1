@@ -1,6 +1,6 @@
 # PowerShell script to deploy the main.bicep template with parameter values
 
-#Requires -Modules "Az"
+#Requires -Modules "Az", "Microsoft.Graph.Groups"
 #Requires -PSEdition Core
 
 # Use these parameters to customize the deployment instead of modifying the default parameter values
@@ -27,8 +27,16 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$DataExportApproverEmail,
 
-	[array]$PublicStorageAccountAllowedIPs
+	[array]$PublicStorageAccountAllowedIPs,
+	[Parameter(Mandatory)]
+	[string]$ProjectAadGroupObjectId
 )
+
+# Break down the group member object ID into transitive user members
+[array]$ProjectTransitiveMembers = Get-MgGroupTransitiveMemberAsUser -GroupId $ProjectAadGroupObjectId -Select UserPrincipalName, Id | `
+	Select-Object @{E = { $_.Id }; L = "objectId" }, @{E = { $_.UserPrincipalName }; L = "upn" } | `
+	# Perform some PowerShell tricks to convert the object into something Bicep/ARM can handle
+	ConvertTo-Json | ConvertFrom-Json -AsHashTable
 
 $TemplateParameters = @{
 	# REQUIRED
@@ -39,6 +47,9 @@ $TemplateParameters = @{
 	dataExportApproverEmail        = $DataExportApproverEmail
 
 	publicStorageAccountAllowedIPs = $PublicStorageAccountAllowedIPs
+
+	projectMemberAadGroupObjectId  = $ProjectAadGroupObjectId
+	projectMemberObjectIds         = $ProjectTransitiveMembers
 
 	# OPTIONAL
 	shortWorkloadName              = $ShortWorkloadName

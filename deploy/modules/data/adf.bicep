@@ -290,9 +290,9 @@ resource dfsDataset 'Microsoft.DataFactory/factories/datasets@2018-06-01' = {
       }
     }
   }
-  dependsOn: [
-    genericLinkedServiceAdlsGen2
-  ]
+  // dependsOn: [
+  //   genericLinkedServiceAdlsGen2
+  // ]
 }
 
 resource pipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01' = {

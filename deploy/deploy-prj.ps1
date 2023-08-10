@@ -3,6 +3,8 @@
 #Requires -Modules "Az", "Microsoft.Graph.Groups"
 #Requires -PSEdition Core
 
+# TODO: Use Bicep parameter file instead 
+
 # Use these parameters to customize the deployment instead of modifying the default parameter values
 [CmdletBinding()]
 Param(
@@ -79,7 +81,7 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	#$AzContext = Get-AzContext
 
 	# AAD-join private storage account
-	# LATER: Extract this into a separate module (we'll need it for the hub (airlock) too)
+	# LATER: Extract this into a separate module or use DeploymentScripts (we'll need it for the hub (airlock) too)
 
 	# TODO: Replace this with the Az cmdlets now available: https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-azure-active-directory-enable?tabs=azure-powershell#configure-the-clients-to-retrieve-kerberos-tickets
 	
@@ -116,8 +118,6 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	
 	# TODO: Grant admin consent for new App representing the Az File share? + exclude from MFA CA
 	
-	# TODO: Set file share (Az RBAC) permissions on share
-
 	# TODO: Set blob RBAC permission on export-request container (inside Bicep, see TODO in main-prj.bicep)
 }
 else {

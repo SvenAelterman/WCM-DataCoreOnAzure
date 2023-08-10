@@ -305,15 +305,49 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
     ]
     subnetId: vNetModule.outputs.subnetIds[1]
     tags: tags
+    // The list of file shares to create in this storage account
     fileShareNames: actualProjectFileShareNames
     privateEndpointInfo: peInfo
 
     // Use the module to assign permissions to the blob storage
+    // LATER: Assign all permissions (ADF, individuals, group) in centrally instead of spread across modules
     principalIds: [ projectMemberAadGroupObjectId ]
   }
 }
 
-// TODO: Assign permissions to the file shares to specified group object IDs
+// Assign permissions to the file shares to specified group object IDs
+module incomingFileShareRbacModule 'common-modules/roleAssignments/roleAssignment-st-fs.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-fs-incoming-rbac'), 64)
+  scope: dataPrjResourceGroup
+  params: {
+    fileShareName: fileShareNames.projectIncoming
+    principalId: projectMemberAadGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles['Storage File Data SMB Share Reader']
+    storageAccountName: privateStorageAccountModule.outputs.storageAccountName
+  }
+}
+
+module sharedFileShareRbacModule 'common-modules/roleAssignments/roleAssignment-st-fs.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-fs-shared-rbac'), 64)
+  scope: dataPrjResourceGroup
+  params: {
+    fileShareName: fileShareNames.projectShared
+    principalId: projectMemberAadGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles['Storage File Data SMB Share Contributor']
+    storageAccountName: privateStorageAccountModule.outputs.storageAccountName
+  }
+}
+
+module personalFileShareRbacModule 'common-modules/roleAssignments/roleAssignment-st-fs.bicep' = [for (fs, i) in personalFileShares: {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-fs-personal-${i}-rbac'), 64)
+  scope: dataPrjResourceGroup
+  params: {
+    fileShareName: fs.fileShareName
+    principalId: fs.objectId
+    roleDefinitionId: rolesModule.outputs.roles['Storage File Data SMB Share Contributor']
+    storageAccountName: privateStorageAccountModule.outputs.storageAccountName
+  }
+}]
 
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault

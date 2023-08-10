@@ -5,15 +5,9 @@ param deploymentNameStructure string
 param subwloadname string = ''
 param privateStorageAcctName string
 param userAssignedIdentityId string
-// @description('Name of the Azure Files share where incoming data should be delivered')
-// param fileShareName string
 param privateStorageAccountConnStringSecretName string
 param keyVaultName string
 param keyVaultResourceGroupName string
-
-// Optional parameters
-// @description('Name of the folder in the Azure file share to deliver incoming data')
-// param incomingFolderName string = 'incoming'
 
 param tags object = {}
 param pipelineName string = 'pipe-data_move'

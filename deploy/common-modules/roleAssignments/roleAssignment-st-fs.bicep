@@ -16,6 +16,7 @@ resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2022-09-01'
   parent: storageAccount
 }
 
+#disable-next-line BCP081 // /fileShares is the right type to assign permissions
 resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/fileShares@2022-09-01' existing = {
   name: fileShareName
   parent: fileService

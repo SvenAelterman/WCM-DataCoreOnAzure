@@ -105,26 +105,26 @@ var fileShareNames = {
 }
 
 // Define three resource groups for the project's Azure resources
-resource corePrjResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource corePrjResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: replace(coreNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
 
-resource dataPrjResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource dataPrjResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: replace(dataNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
 
-resource computeResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource computeResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   name: replace(computeNamingStructure, '{rtype}', 'rg')
   location: location
   tags: tags
 }
 
 // Get a reference to the hub's core resource group
-resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' existing = {
   name: replace(hubCoreNamingStructure, '{rtype}', 'rg')
   scope: subscription(hubSubscriptionId)
 }
@@ -344,10 +344,12 @@ module personalFileShareRbacModule 'common-modules/roleAssignments/roleAssignmen
   params: {
     fileShareName: fs.fileShareName
     principalId: fs.objectId
-    roleDefinitionId: rolesModule.outputs.roles['Storage File Data SMB Share Contributor']
+    roleDefinitionId: roles['Storage File Data SMB Share Contributor']
     storageAccountName: privateStorageAccountModule.outputs.storageAccountName
   }
 }]
+
+var roles = rolesModule.outputs.roles
 
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
@@ -473,6 +475,8 @@ module dataAutomationModule 'modules/data.bicep' = {
     hubKeyVaultResourceGroupName: coreHubResourceGroup.name
     publicStorageAccountAllowedIPs: publicStorageAccountAllowedIPs
     projectMemberAadGroupObjectId: projectMemberAadGroupObjectId
+
+    fileShareNames: fileShareNames
   }
 }
 

@@ -92,7 +92,7 @@ resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@20
   name: c
 }]
 
-resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2021-09-01' = {
+resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2022-09-01' = {
   parent: storageAccount
   name: 'default'
   properties: {
@@ -101,6 +101,7 @@ resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2021-09-01
       enabled: true
     }
     protocolSettings: {
+      // See https://learn.microsoft.com/azure/storage/files/storage-how-to-use-files-windows for minimum client requirements
       smb: {
         versions: 'SMB3.0;SMB3.1.1;'
         authenticationMethods: 'Kerberos;'
@@ -112,12 +113,12 @@ resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2021-09-01
 }
 
 // Create each required file share
-resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2021-09-01' = [for fs in fileShareNames: {
+resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2022-09-01' = [for fs in fileShareNames: {
   parent: fileServices
-  name: fs
+  name: take(fs, 63)
 }]
 
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = [for info in privateEndpointInfo: if (privatize) {
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-04-01' = [for info in privateEndpointInfo: if (privatize) {
   name: replace(baseName, '{rtype}', 'pep-${info.subResourceName}')
   location: location
   tags: tags
@@ -139,7 +140,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-03-01' = [for 
   }
 }]
 
-resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2021-03-01' = [for (info, i) in privateEndpointInfo: if (privatize) {
+resource privateEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-04-01' = [for (info, i) in privateEndpointInfo: if (privatize) {
   name: 'default'
   parent: privateEndpoint[i]
   properties: {

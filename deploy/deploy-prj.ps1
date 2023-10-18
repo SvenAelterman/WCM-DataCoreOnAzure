@@ -34,7 +34,7 @@ Param(
 	[string]$ProjectAadGroupObjectId
 )
 
-Connect-MgGraph -Scopes "Group.Read.All"
+Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
 
 # Break down the group member object ID into transitive user members
 [array]$ProjectTransitiveMembers = Get-MgGroupTransitiveMemberAsUser -GroupId $ProjectAadGroupObjectId -Select UserPrincipalName, Id | `

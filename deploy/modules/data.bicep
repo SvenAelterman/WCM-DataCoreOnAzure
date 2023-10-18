@@ -19,6 +19,8 @@ param hubSubscriptionId string
 param publicStorageAccountAllowedIPs array = []
 param projectMemberAadGroupObjectId string
 
+param fileShareNames object
+
 param tags object = {}
 
 resource hubKvRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
@@ -155,12 +157,12 @@ module ingestTriggerModule 'data/adfTrigger.bicep' = {
     sourceStorageAccountName: publicStorageAccountModule.outputs.storageAccountName
     sinkStorageAccountName: privateStorageAccountName
     containerName: containerNames.ingest
-    additionalSinkFolderPath: 'incoming'
-    // TODO: Do not hardcode file share name 'shared'
-    sinkFileShareName: 'shared'
+    // TODO: This is no longer needed because incoming has its own share
+    additionalSinkFolderPath: 'i'
+    sinkFileShareName: fileShareNames.projectIncoming
     // The URL of the project's Key Vault
     // The project's KV stores the connection string to the project's file share
-    // TODO: Validate the KV URL has the https:// prefix already
+    // TODO: Validate the KV URL has the https:// prefix already?
     sinkConnStringKvBaseUrl: prjKeyVault.properties.vaultUri
   }
 }

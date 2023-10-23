@@ -62,7 +62,6 @@ var airlockNamingStructure = replace(namingStructure, '{subwloadname}', subWorkl
 // REFERENCE MODULES
 module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
-  scope: coreHubResourceGroup
 }
 
 module abbreviationsModule 'common-modules/abbreviations.bicep' = {
@@ -78,11 +77,11 @@ resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = 
   tags: tags
 }
 
-resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-  name: replace(avdNamingStructure, '{rtype}', 'rg')
-  location: location
-  tags: tags
-}
+// resource avdHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+//   name: replace(avdNamingStructure, '{rtype}', 'rg')
+//   location: location
+//   tags: tags
+// }
 
 // Contains the storage account for reviewing export requests
 resource airlockHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -122,6 +121,7 @@ var hubVNetSubnets = [
     nsgId: ''
     routeTableId: ''
   }
+  // LATER: Remove this subnet - should adopt object-based instead of array-based subnet definitions
   {
     name: 'avd'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
@@ -205,6 +205,15 @@ module computePrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
   }
 }
 
+// Create a Private DNS Zone for the AVD host pool
+module avdConnectionPrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-avd-connection')
+  scope: coreHubResourceGroup
+  params: {
+    zoneName: 'privatelink.wvd.microsoft.com'
+  }
+}
+
 // Link the compute Private DNS Zone to the hub virtual network
 module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'dns-link-compute')
@@ -231,23 +240,23 @@ module logModule 'modules/log.bicep' = {
 }
 
 // Create the Azure Virtual Desktop infrastructure
-module hubAvdModule 'modules/avd.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'avd')
-  dependsOn: [
-    hubVnetModule
-  ]
-  scope: avdHubResourceGroup
-  params: {
-    namingStructure: namingStructure
-    location: location
-    tags: tags
-    abbreviations: abbreviationsModule.outputs.abbreviations
-    deploymentNameStructure: deploymentNameStructure
-    avdVmHostNameStructure: avdVmHostNameStructure
-    avdSubnetId: hubVnetModule.outputs.subnetIds[1]
-    environment: environment
-  }
-}
+// module hubAvdModule 'modules/avd.bicep' = {
+//   name: replace(deploymentNameStructure, '{rtype}', 'avd')
+//   dependsOn: [
+//     hubVnetModule
+//   ]
+//   scope: avdHubResourceGroup
+//   params: {
+//     namingStructure: namingStructure
+//     location: location
+//     tags: tags
+//     abbreviations: abbreviationsModule.outputs.abbreviations
+//     deploymentNameStructure: deploymentNameStructure
+//     avdVmHostNameStructure: avdVmHostNameStructure
+//     avdSubnetId: hubVnetModule.outputs.subnetIds[1]
+//     environment: environment
+//   }
+// }
 
 module computeGalleryModule 'modules/gal.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'gal')

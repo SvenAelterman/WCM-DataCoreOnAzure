@@ -43,6 +43,8 @@ param shortHubWorkloadName string = take(replace(replace(replace(replace(replace
 #disable-next-line no-unused-params
 param deployResearchVm bool = false
 
+param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
+
 // Optional parameters
 param tags object = {}
 param sequence int = 1
@@ -68,6 +70,7 @@ var subWorkloadNames = {
   compute: 'compute'
   hubAirlock: 'airlock'
   hubCore: 'core'
+  avd: 'avd'
 }
 
 // shortCoreNamingConvention is used by the shortname modules for key vault 
@@ -79,6 +82,7 @@ var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{en
 var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.core)
 var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.data)
 var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.compute)
+var avdNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.avd)
 
 // Names of hub resources [The hub is deployed from main-hub.bicep before deploying project resources.]
 var hubSequenceFormatted = format('{0:00}', hubSequence)
@@ -123,6 +127,12 @@ resource computeResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' = 
   tags: tags
 }
 
+resource avdResourceGroup 'Microsoft.Resources/resourceGroups@2023-07-01' = {
+  name: replace(avdNamingStructure, '{rtype}', 'rg')
+  location: location
+  tags: tags
+}
+
 // Get a reference to the hub's core resource group
 resource coreHubResourceGroup 'Microsoft.Resources/resourceGroups@2022-09-01' existing = {
   name: replace(hubCoreNamingStructure, '{rtype}', 'rg')
@@ -148,9 +158,13 @@ resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing
   scope: coreHubResourceGroup
 }]
 
+resource avdConnectionPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: 'privatelink.wvd.microsoft.com'
+  scope: coreHubResourceGroup
+}
+
 module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
-  scope: corePrjResourceGroup
 }
 
 // Create a network security group for the default subnet
@@ -188,6 +202,7 @@ var subnets = [
     // LATER: Consider renaming to 'compute'
     name: 'default'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
+    // TODO: If Bastion is deployed in Hub, allow RDP connections from hub Bastion
     nsgId: defaultNsg.outputs.nsgId
     routeTableId: udrModule.outputs.routeTableId
   }
@@ -424,7 +439,6 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
   params: {
     environment: environment
     location: location
-    //namingConvention: replace(namingConvention, '{subwloadname}', 'a')
     namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubAirlock, 1))
     resourceType: 'st'
     sequence: sequence
@@ -510,6 +524,45 @@ module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep
     // New NICs in the virtual network will register with DNS
     registrationEnabled: true
   }
+}
+
+// Link the project virtual network to the hub's AVD Private DNS Zone
+module avdConnectionPrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-avd-connection')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: avdConnectionPrivateDnsZone.name // 'privatelink.wvd.microsoft.com'
+    vNetId: vNetModule.outputs.vNetId
+  }
+}
+
+module avdModule 'modules/avd.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'avd'), 64)
+  scope: avdResourceGroup
+  params: {
+    location: location
+    abbreviations: abbreviationsModule.outputs.abbreviations
+    avdSubnetId: vNetModule.outputs.subnetIds[0] // 'default' subnet
+    avdVmHostNameStructure: avdVmHostNameStructure
+    namingStructure: thisNamingStructure
+    usePrivateLinkForHostPool: true
+    privateEndpointSubnetId: vNetModule.outputs.subnetIds[0] // 'default' subnet
+    deploymentNameStructure: deploymentNameStructure
+    deployVmsInSeparateRG: true
+    tags: tags
+    privateLinkDnsZoneId: avdConnectionPrivateDnsZone.id
+    environment: environment
+    workloadName: workloadName
+
+    loginPermissionObjectId: projectMemberAadGroupObjectId
+    dvuRoleDefinitionId: roles.DesktopVirtualizationUser
+    virtualMachineUserLoginRoleDefinitionId: roles.VirtualMachineUserLogin
+  }
+}
+
+module abbreviationsModule 'common-modules/abbreviations.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'abbrev')
+  scope: coreHubResourceGroup
 }
 
 output vnetAddressSpace array = vNetModule.outputs.vNetAddressSpace

@@ -14,7 +14,7 @@ Param(
 	[string]$WorkloadName = 'wcmprj',
 	[int]$Sequence = 2,
 	[string]$NamingConvention = "{rtype}-$WorkloadName-{subwloadname}-{env}-{loc}-{seq}",
-	[string]$VmNumber = "1",
+	[string]$VmNumber = "3",
 	[Parameter(Mandatory)]
 	[string]$ProjectSubscriptionId,
 	[Parameter(Mandatory)]
@@ -32,10 +32,10 @@ $TemplateParameters = @{
 	adminUsername      = 'AzureUser'
 	# OPTIONAL
 	tags               = @{
-		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
-		purpose        = $Environment
-		lifetime       = 'medium'
-		'customer-ref' = 'WCM'
+		'date-created'       = (Get-Date -Format 'yyyy-MM-dd')
+		purpose              = $Environment
+		lifetime             = 'medium'
+		'customer-reference' = 'WCM'
 	}
 }
 

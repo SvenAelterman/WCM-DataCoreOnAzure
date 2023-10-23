@@ -8,19 +8,19 @@ param avdSubnetRange string
 
 // TODO: Define securityRules in JSON content file
 var securityRules = [
-  {
-    name: 'Allow_RDP_From_AVD'
-    properties: {
-      direction: 'Inbound'
-      priority: 200
-      protocol: 'TCP'
-      access: 'Allow'
-      sourceAddressPrefix: avdSubnetRange
-      sourcePortRange: '*'
-      destinationAddressPrefix: '*'
-      destinationPortRange: '3389'
-    }
-  }
+  // {
+  //   name: 'Allow_RDP_From_AVD'
+  //   properties: {
+  //     direction: 'Inbound'
+  //     priority: 200
+  //     protocol: 'TCP'
+  //     access: 'Allow'
+  //     sourceAddressPrefix: avdSubnetRange
+  //     sourcePortRange: '*'
+  //     destinationAddressPrefix: '*'
+  //     destinationPortRange: '3389'
+  //   }
+  // }
   {
     name: 'Allow_AzureUpdateDelivery'
     properties: {
@@ -50,21 +50,21 @@ var securityRules = [
   //     ]
   //   }
   // }
+  // {
+  //   name: 'Allow_AVD'
+  //   properties: {
+  //     direction: 'Outbound'
+  //     priority: 280
+  //     protocol: '*'
+  //     access: 'Allow'
+  //     sourceAddressPrefix: 'VirtualNetwork'
+  //     sourcePortRange: '*'
+  //     destinationAddressPrefix: 'WindowsVirtualDesktop'
+  //     destinationPortRange: '*'
+  //   }
+  // }
   {
-    name: 'Allow_AVD'
-    properties: {
-      direction: 'Outbound'
-      priority: 280
-      protocol: '*'
-      access: 'Allow'
-      sourceAddressPrefix: 'VirtualNetwork'
-      sourcePortRange: '*'
-      destinationAddressPrefix: 'WindowsVirtualDesktop'
-      destinationPortRange: '*'
-    }
-  }
-  {
-    name: 'Allow_MDC'
+    name: 'Allow_MDfC'
     properties: {
       direction: 'Outbound'
       priority: 220

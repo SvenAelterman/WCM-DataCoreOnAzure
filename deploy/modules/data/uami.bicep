@@ -2,7 +2,7 @@ param location string
 param namingStructure string
 param subwloadname string = ''
 param roles object
-param tags object = {}
+param tags object
 
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
 

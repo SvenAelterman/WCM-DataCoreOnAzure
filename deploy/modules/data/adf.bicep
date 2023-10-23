@@ -80,6 +80,7 @@ resource integrationRuntime 'Microsoft.DataFactory/factories/integrationRuntimes
 
 module rolesModule '../../common-modules/roles.bicep' = {
   name: 'roles'
+  scope: subscription()
 }
 
 // RBAC role assignment for ADF to Key Vault

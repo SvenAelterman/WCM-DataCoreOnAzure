@@ -4,6 +4,7 @@ param abbreviations object
 param avdVmHostNameStructure string
 param avdSubnetId string
 param workloadName string
+param workspaceFriendlyName string = '${workloadName} Research Enclave Access'
 
 param environment string = ''
 param deploymentNameStructure string = '{rtype}-${utcNow()}'
@@ -15,9 +16,11 @@ param loginPermissionObjectId string
 param dvuRoleDefinitionId string
 param virtualMachineUserLoginRoleDefinitionId string
 
+param overrideVmResourceGroupName string = ''
+
 param usePrivateLinkForHostPool bool = true
-param privateEndpointSubnetId string = ''
-param privateLinkDnsZoneId string = ''
+param privateEndpointSubnetId string
+param privateLinkDnsZoneId string
 
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', 'avd')
 var avdVmNamingStructure = replace(namingStructure, '{subwloadname}', deployVmsInSeparateRG ? 'avd-vm' : 'avd')
@@ -98,7 +101,7 @@ resource workspace 'Microsoft.DesktopVirtualization/workspaces@2023-09-05' = {
   name: replace(avdNamingStructure, '{rtype}', abbreviations['AVD Workspace'])
   location: location
   properties: {
-    friendlyName: '${workloadName} Research Enclave Access'
+    friendlyName: workspaceFriendlyName
     applicationGroupReferences: [
       desktopApplicationGroup.id
     ]
@@ -122,6 +125,8 @@ module avdVM 'avd-vmRG.bicep' = {
 
     loginPermissionObjectId: loginPermissionObjectId
     virtualMachineUserLoginRoleDefinitionId: virtualMachineUserLoginRoleDefinitionId
+
+    overrideVmResourceGroupName: overrideVmResourceGroupName
   }
 }
 

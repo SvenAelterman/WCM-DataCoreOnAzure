@@ -45,6 +45,10 @@ param deployResearchVm bool = false
 
 param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
 
+// TODO: Rename AAD to EntraId
+@description('The Entra ID Object ID of the Data Core Sysadmins group. Members of this group will have Administrator acccess to the airlock VMs.')
+param aadSysAdminGroupObjectId string
+
 // Optional parameters
 param tags object = {}
 param sequence int = 1
@@ -426,7 +430,7 @@ module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
 }
 
 // Reference the existing hub's airlock resource group
-resource airlockRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource airlockHubRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: replace(hubAirlockNamingStructure, '{rtype}', 'rg')
   scope: subscription(hubSubscriptionId)
 }
@@ -435,7 +439,7 @@ resource airlockRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
 // LATER: Have as parameter for input instead of recreating?
 module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'stname')
-  scope: airlockRg
+  scope: airlockHubRg
   params: {
     environment: environment
     location: location
@@ -448,6 +452,7 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
 }
 
 // Get the name of the hub's Key Vault
+// LATER: Take as an input parameter instead
 module hubKeyVaultShortNameModule 'common-modules/shortname.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'kv-shortname')
   scope: coreHubResourceGroup
@@ -494,7 +499,15 @@ module dataAutomationModule 'modules/data.bicep' = {
   }
 }
 
-// TODO: Permissions to log into VMs - RBAC role assignments
+// Permissions for system admins to log into VMs as Administrator/root
+module vmAdminLoginRbacModule 'common-modules/roleAssignments/roleAssignment-rg.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'rg-adminlogin-rbac'), 64)
+  scope: computeResourceGroup
+  params: {
+    principalId: aadSysAdminGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles.VirtualMachineAdministratorLogin
+  }
+}
 
 // Create an IP group to be used in Azure Firewall rules.
 module ipGroupModule 'modules/ipGroup.bicep' = {
@@ -553,6 +566,9 @@ module avdModule 'modules/avd.bicep' = {
     privateLinkDnsZoneId: avdConnectionPrivateDnsZone.id
     environment: environment
     workloadName: workloadName
+
+    // Deploy the research VM in the compute resource group, not in the default 'avd-vm' resource group
+    overrideVmResourceGroupName: computeResourceGroup.name
 
     loginPermissionObjectId: projectMemberAadGroupObjectId
     dvuRoleDefinitionId: roles.DesktopVirtualizationUser

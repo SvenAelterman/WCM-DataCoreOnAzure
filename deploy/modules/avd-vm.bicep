@@ -17,7 +17,7 @@ var vmTemplateUri = '${nestedTemplatesLocation}managedDisks-galleryvm.json'
 var rdshPrefix = '${avdVmHostNameStructure}-'
 
 // Create availability set
-// TODO: Consider moving this to the AVD resource group instead of the VM resource group [the availability set should survive deleting VMs]
+// LATER: Consider moving this to the AVD resource group instead of the VM resource group [the availability set should survive deleting VMs]
 resource availabilitySet 'Microsoft.Compute/availabilitySets@2021-11-01' = {
   name: replace(namingStructure, '{rtype}', abbreviations['Availability Set'])
   location: location
@@ -31,6 +31,7 @@ resource availabilitySet 'Microsoft.Compute/availabilitySets@2021-11-01' = {
 }
 
 // Deploy the session host VMs just like the Add VM to hostpool process would
+#disable-next-line no-deployments-resources
 resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
   name: replace(deploymentNameStructure, '{rtype}', 'avdvm')
   properties: {
@@ -60,7 +61,7 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
         value: false
       }
       vmGalleryImageSKU: {
-        value: 'win11-21h2-avd-m365'
+        value: 'win11-22h2-avd-m365'
       }
       rdshPrefix: {
         value: rdshPrefix
@@ -77,6 +78,7 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
       enableAcceleratedNetworking: {
         value: true
       }
+      // TODO: Pull from deployment time KeyVault!
       vmAdministratorAccountUsername: {
         value: 'AzureUser'
       }
@@ -132,4 +134,4 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
   }
 }
 
-// TODO: Join hosts to ASG
+// MAYBE: Join hosts to ASG

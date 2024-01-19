@@ -18,8 +18,8 @@ param virtualMachineSize string = 'Standard_D2s_v4'
 
 param imageReference object = {
   publisher: 'microsoftwindowsdesktop'
-  offer: 'office-365'
-  sku: 'win10-22h2-avd-m365-g2'
+  offer: 'windows-11'
+  sku: 'win11-22h2-ent'
   version: 'latest'
 }
 

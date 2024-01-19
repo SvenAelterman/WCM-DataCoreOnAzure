@@ -12,7 +12,7 @@ Param(
 	[ValidateSet('Test', 'Demo', 'Prod')]
 	[string]$Environment = 'Demo',
 	[string]$WorkloadName = 'wcmhub',
-	[int]$Sequence = 2,
+	[int]$Sequence = 1,
 	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
 	[string]$ComputeDnsSuffix,
 	[securestring]$AirlockVmLocalAdminPassword,
@@ -52,6 +52,7 @@ $DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$E
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AFTER ACTIONS
+	# LATER: Move to deployment script
 
 	# JOIN AIRLOCK STORAGE ACCOUNT TO AAD FOR AUTH
 	# Extract output values from the DeploymentResult

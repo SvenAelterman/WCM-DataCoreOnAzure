@@ -7,6 +7,8 @@
  * - Ensures the max length does not exceed the specified value
  */
 
+// TODO: Update to latest
+
 param namingConvention string
 param location string
 @allowed([

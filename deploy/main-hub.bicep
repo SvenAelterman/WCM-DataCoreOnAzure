@@ -16,14 +16,17 @@ param workloadName string
 @maxLength(10)
 param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 @secure()
-param airlockVmLocalAdminPassword string
+#disable-next-line no-unused-params
+param airlockVmLocalAdminPassword string // Keeping this unused parameter for future use with Key Vault secrets
 
 // Create private DNS zone with this name
 param computeDnsSuffix string
 
 // The AAD Object IDs of the user groups representing the different roles of the data core
 // Required to complete role assignments
+@description('The Entra ID Object ID of the Data Core Sysadmins group. Members of this group will have Administrator acccess to the airlock VMs.')
 param aadSysAdminGroupObjectId string
+@description('The Entra ID Object ID of the Data Core Data Admins group. Members of this group will have user acccess to the airlock VMs.')
 param aadDataAdminGroupObjectId string
 
 param vnetAddressSpace string = '10.19.0.0/16'
@@ -34,13 +37,16 @@ param tags object = {}
 param sequence int = 1
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param deploymentTime string = utcNow()
-param avdVmHostNameStructure string = 'vm-avd'
+@description('The naming convention for the computer name of the Airlock review VMs. Maximum is 11 characters to allow for the VM number to be added. At this time, this is also the Azure resource name of the VMs.')
+@maxLength(11)
+param airlockVmHostNameStructure string = 'al-${workloadName}-${sequence}'
 param deployBastionHost bool = true
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
 
+// This array will determine which private DNS zones will be created for storage endpoints
 var storageAccountSubResourcePrivateEndpoints = [
   'blob'
   'file'
@@ -62,7 +68,6 @@ var airlockNamingStructure = replace(namingStructure, '{subwloadname}', subWorkl
 // REFERENCE MODULES
 module rolesModule 'common-modules/roles.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'roles')
-  scope: coreHubResourceGroup
 }
 
 module abbreviationsModule 'common-modules/abbreviations.bicep' = {
@@ -102,17 +107,6 @@ resource subscriptionLoginRbac 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
-// Enable data admins to log on to Airlock VMs
-module airlockLoginRbacModule 'modules/resourceGroupRbac.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'rbac-airlock-login')
-  scope: airlockHubResourceGroup
-  params: {
-    principalId: aadDataAdminGroupObjectId
-    principalType: 'Group'
-    roleDefinitionId: rolesModule.outputs.roles['Virtual Machine User Login']
-  }
-}
-
 var vnetAbbrev = abbreviationsModule.outputs.abbreviations['Virtual Network']
 
 var hubVNetSubnets = [
@@ -122,6 +116,7 @@ var hubVNetSubnets = [
     nsgId: ''
     routeTableId: ''
   }
+  // LATER: Remove this subnet - should adopt object-based instead of array-based subnet definitions
   {
     name: 'avd'
     addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
@@ -191,9 +186,6 @@ module storagePrivateDnsZoneVNetLinksModule 'modules/privateDnsZoneVNetLink.bice
     vNetId: hubVnetModule.outputs.vNetId
     registrationEnabled: false
   }
-  dependsOn: [
-    storagePrivateDnsZonesModule[i]
-  ]
 }]
 
 // Create a Private DNS Zone for the computer objects
@@ -215,9 +207,25 @@ module computePrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep
     // New NICs in the virtual network will register with DNS
     registrationEnabled: true
   }
-  dependsOn: [
-    computePrivateDnsZoneModule
-  ]
+}
+
+// Create a Private DNS Zone for the AVD host pool
+module avdConnectionPrivateDnsZoneModule 'modules/privateDnsZone.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-avd-connection')
+  scope: coreHubResourceGroup
+  params: {
+    zoneName: 'privatelink.wvd.microsoft.com'
+  }
+}
+
+// Link the AVD host pool private DNS Zone to the hub virtual network
+module avdPrivateDnsZoneVNetLinkModule 'modules/privateDnsZoneVNetLink.bicep' = {
+  name: replace(deploymentNameStructure, '{rtype}', 'dns-link-avd')
+  scope: coreHubResourceGroup
+  params: {
+    dnsZoneName: avdConnectionPrivateDnsZoneModule.outputs.zoneName
+    vNetId: hubVnetModule.outputs.vNetId
+  }
 }
 
 module logModule 'modules/log.bicep' = {
@@ -230,8 +238,8 @@ module logModule 'modules/log.bicep' = {
   }
 }
 
-// Create the Azure Virtual Desktop infrastructure
-module hubAvdModule 'modules/avd.bicep' = {
+// Create the Azure Virtual Desktop infrastructure for the centralized Airlock review
+module hubAirlockAvdModule 'modules/avd.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'avd')
   dependsOn: [
     hubVnetModule
@@ -243,9 +251,23 @@ module hubAvdModule 'modules/avd.bicep' = {
     tags: tags
     abbreviations: abbreviationsModule.outputs.abbreviations
     deploymentNameStructure: deploymentNameStructure
-    avdVmHostNameStructure: avdVmHostNameStructure
-    avdSubnetId: hubVnetModule.outputs.subnetIds[1]
+    avdVmHostNameStructure: airlockVmHostNameStructure
+    avdSubnetId: hubVnetModule.outputs.subnetIds[3] // AirlockCompute subnet
     environment: environment
+
+    dvuRoleDefinitionId: rolesModule.outputs.roles.DesktopVirtualizationUser
+    virtualMachineUserLoginRoleDefinitionId: rolesModule.outputs.roles.VirtualMachineUserLogin
+    deployVmsInSeparateRG: true
+    overrideVmResourceGroupName: airlockHubResourceGroup.name
+    usePrivateLinkForHostPool: true
+    privateLinkDnsZoneId: avdConnectionPrivateDnsZoneModule.outputs.zoneId
+    // LATER: Consider creating a private endpoint specific subnet
+    privateEndpointSubnetId: hubVnetModule.outputs.subnetIds[0] // Default subnet
+    loginPermissionObjectId: aadDataAdminGroupObjectId
+
+    workloadName: subWorkloadNames.airlock
+
+    workspaceFriendlyName: 'Data Core Airlock Access'
   }
 }
 
@@ -260,8 +282,9 @@ module computeGalleryModule 'modules/gal.bicep' = {
   }
 }
 
-// Create the airlock resources: storage account, private endpoints, VM
-module airlockModule 'modules/airlock.bicep' = {
+// Create the airlock resources: storage account, private endpoints
+// The Airlock review VM(s) are deployed from the AVD module
+module airlockStorageModule 'modules/airlock.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'airlock')
   scope: airlockHubResourceGroup
   params: {
@@ -272,17 +295,14 @@ module airlockModule 'modules/airlock.bicep' = {
     workloadName: workloadName
     airlockNamingStructure: airlockNamingStructure
     sequence: sequence
-    storageAccountSubResourcePrivateEndpoints: storageAccountSubResourcePrivateEndpoints
+    storageAccountSubResourcePrivateEndpoints: [ 'file' ]
     // LATER: Do not rely on index to find the correct subnet
     dataSubnetId: hubVnetModule.outputs.subnetIds[2]
-    vmSubnetName: hubVNetSubnets[3].name
-    privateDnsZones: [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: {
-      zoneId: storagePrivateDnsZonesModule[i].outputs.zoneId
-      zoneName: storagePrivateDnsZonesModule[i].outputs.zoneName
-    }]
-    vmLocalAdminPassword: airlockVmLocalAdminPassword
-    sequenceFormatted: sequenceFormatted
-    vmVnetId: hubVnetModule.outputs.vNetId
+    privateDnsZones: [ {
+        // [1] is the file endpoint
+        zoneId: storagePrivateDnsZonesModule[1].outputs.zoneId
+        zoneName: storagePrivateDnsZonesModule[1].outputs.zoneName
+      } ]
     tags: tags
   }
 }
@@ -316,7 +336,7 @@ module storageConnStringSecretModule 'modules/keyVault-StorageAccountConnString.
   params: {
     keyVaultName: keyVaultModule.outputs.keyVaultName
     keyVaultResourceGroupName: coreHubResourceGroup.name
-    storageAccountName: airlockModule.outputs.storageAccountName
+    storageAccountName: airlockStorageModule.outputs.storageAccountName
     storageAccountResourceGroupName: airlockHubResourceGroup.name
   }
 }
@@ -347,8 +367,7 @@ module azureFirewallModule 'modules/azfw.bicep' = {
 }
 
 output privateDnsZoneIds array = [for (subresource, i) in storageAccountSubResourcePrivateEndpoints: storagePrivateDnsZonesModule[i].outputs.zoneId]
-output airlockVmName string = airlockModule.outputs.vmName
-output airlockStorageAccountName string = airlockModule.outputs.storageAccountName
+output airlockStorageAccountName string = airlockStorageModule.outputs.storageAccountName
 output airlockResourceGroupName string = airlockHubResourceGroup.name
 output kvName string = keyVaultShortNameModule.outputs.shortName
 output shortWorkloadName string = shortWorkloadName

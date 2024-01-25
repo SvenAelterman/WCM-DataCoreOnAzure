@@ -1,2 +1,5 @@
 main-*.json
 *.user.ps1
+
+*.bicepparam
+!*.sample.bicepparam

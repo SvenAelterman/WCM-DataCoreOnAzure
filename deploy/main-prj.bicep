@@ -20,7 +20,7 @@ param dataExportApproverEmail string
 @description('Single project membership AAD group object ID.')
 param projectMemberAadGroupObjectId string
 @description('Array of objects containing individual user object IDs and UPNs. Schema: { upn: string, objectId: string }')
-param projectMemberObjectIds array
+param projectMemberObjectIds array = []
 
 param publicStorageAccountAllowedIPs array = []
 

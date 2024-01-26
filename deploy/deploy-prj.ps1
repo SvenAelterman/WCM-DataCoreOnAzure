@@ -1,4 +1,7 @@
-# PowerShell script to deploy the main.bicep template with parameter values
+<#
+.SYNOPSIS
+	PowerShell script to deploy the main.bicep template with parameter values
+#>
 
 #Requires -Modules "Az", "Microsoft.Graph.Groups"
 #Requires -PSEdition Core
@@ -6,35 +9,37 @@
 # TODO: Use Bicep parameter file instead 
 
 # Use these parameters to customize the deployment instead of modifying the default parameter values
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 Param(
-	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus',
-	# The environment descriptor
-	[ValidateSet('Test', 'Demo', 'Prod')]
-	[string]$Environment = 'Demo',
-	[string]$WorkloadName = 'wcmprj',
-	[ValidateLength(1, 10)]
-	[string]$ShortWorkloadName = 'wcmprj',
-	[int]$Sequence = 2,
-	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
 	[Parameter(Mandatory)]
 	[string]$ProjectSubscriptionId,
 	[Parameter(Mandatory)]
-	[string]$HubSubscriptionId,
-	[Parameter(Mandatory)]
 	[string]$TenantId,
-	[Parameter(Mandatory)]
-	[string]$ComputeDnsSuffix,
-	[Parameter(Mandatory)]
-	[string]$DataExportApproverEmail,
-
-	[array]$PublicStorageAccountAllowedIPs,
-	[Parameter(Mandatory)]
-	[string]$ProjectAadGroupObjectId
+	[Parameter()]
+	[string]$TemplateParameterFile = '.\main-prj.bicepparam'
 )
 
 Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
+
+# Define common parameters for the New-AzDeployment cmdlet
+[hashtable]$CmdLetParameters = @{
+	TemplateFile           = '.\main-prj.bicep'
+	projectMemberObjectIds = $ProjectTransitiveMembers
+}
+
+# Process the template parameter file and read relevant values for use here
+Write-Verbose "Using template parameter file '$TemplateParameterFile'"
+[string]$TemplateParameterJsonFile = [System.IO.Path]::ChangeExtension($TemplateParameterFile, 'json')
+bicep build-params $TemplateParameterFile --outfile $TemplateParameterJsonFile
+
+$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterJsonFile)
+
+# Read the values from the parameters file, to use when generating the $DeploymentName value
+$ParameterFileContents = (Get-Content $TemplateParameterJsonFile | ConvertFrom-Json)
+$WorkloadName = $ParameterFileContents.parameters.workloadName.value
+$Location = $ParameterFileContents.parameters.location.value
+
+$ProjectAadGroupObjectId = $ParameterFileContents.parameters.projectMemberAadGroupObjectId.value
 
 # Break down the group member object ID into transitive user members
 [array]$ProjectTransitiveMembers = Get-MgGroupTransitiveMemberAsUser -GroupId $ProjectAadGroupObjectId -Select UserPrincipalName, Id | `
@@ -42,45 +47,23 @@ Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
 	# Perform some PowerShell tricks to convert the object into something Bicep/ARM can handle
 	ConvertTo-Json | ConvertFrom-Json -AsHashTable
 
-$TemplateParameters = @{
-	# REQUIRED
-	location                       = $Location
-	environment                    = $Environment
-	workloadName                   = $WorkloadName
-	computeDnsSuffix               = $ComputeDnsSuffix
-	dataExportApproverEmail        = $DataExportApproverEmail
+Write-Verbose "Project member count: $($ProjectTransitiveMembers.Length)"
 
-	publicStorageAccountAllowedIPs = $PublicStorageAccountAllowedIPs
+# Generate a unique name for the deployment
+[string]$DeploymentName = "$WorkloadName-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)"
+$CmdLetParameters.Add('Name', $DeploymentName)
+$CmdLetParameters.Add('Location', $Location)
 
-	projectMemberAadGroupObjectId  = $ProjectAadGroupObjectId
-	projectMemberObjectIds         = $ProjectTransitiveMembers
+# Ignore the WhatIfPreference for the subscription selection, otherwise the deployment might indicate that all resources will be created.
+Select-AzSubscription $ProjectSubscriptionId -Tenant $TenantId -WhatIf:$false
 
-	# OPTIONAL
-	shortWorkloadName              = $ShortWorkloadName
-	hubSubscriptionId              = $HubSubscriptionId
-	hubWorkloadName                = 'wcmhub'
-	sequence                       = $Sequence
-	hubSequence                    = 2
-	namingConvention               = $NamingConvention
-	tags                           = @{
-		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
-		purpose        = $Environment
-		lifetime       = 'medium'
-		'customer-ref' = 'WCM'
-	}
-}
-
-Select-AzSubscription $ProjectSubscriptionId -Tenant $TenantId
-
-$DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
-	-TemplateFile ".\main-prj.bicep" -TemplateParameterObject $TemplateParameters
+# Execute the deployment
+$DeploymentResult = New-AzDeployment @CmdLetParameters -WhatIf:$WhatIfPreference
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# Extract output values from the DeploymentResult
 	[string]$PrivateStorageAccountName = $DeploymentResult.Outputs.privateStorageAccountName.Value
 	[string]$DataResourceGroupName = $DeploymentResult.Outputs.dataResourceGroupName.Value
-
-	#$AzContext = Get-AzContext
 
 	# AAD-join private storage account
 	# LATER: Extract this into a separate module or use DeploymentScripts (we'll need it for the hub (airlock) too)
@@ -123,5 +106,8 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# TODO: Set blob RBAC permission on export-request container (inside Bicep, see TODO in main-prj.bicep)
 }
 else {
-	Write-Error -Message "❌ Project Deployment failed: $($DeploymentResult.ProvisioningState)" -ErrorAction Stop
+	if (! $WhatIfPreference) {
+		$DeploymentResult
+		Write-Error -Message "❌ Project Deployment failed: $($DeploymentResult.ProvisioningState)" -ErrorAction Stop
+	}
 }

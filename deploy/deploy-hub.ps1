@@ -1,54 +1,50 @@
-# PowerShell script to deploy the main.bicep template with parameter values
+<#
+.SYNOPSIS
+    Deploy the WCM DataCore Secure Enclave Hub resources to the target subscription.
+#>
 
 #Requires -Modules "Az"
 #Requires -PSEdition Core
 
 # Use these parameters to customize the deployment instead of modifying the default parameter values
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 Param(
-	[ValidateSet('eastus2', 'eastus')]
-	[string]$Location = 'eastus',
-	# The environment descriptor
-	[ValidateSet('Test', 'Demo', 'Prod')]
-	[string]$Environment = 'Demo',
-	[string]$WorkloadName = 'wcmhub',
-	[int]$Sequence = 1,
-	[string]$NamingConvention = "{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}",
-	[string]$ComputeDnsSuffix,
-	[securestring]$AirlockVmLocalAdminPassword,
 	[Parameter(Mandatory)]
 	[string]$HubSubscriptionId,
 	[Parameter(Mandatory)]
 	[string]$TenantId,
-	[string]$AadSysAdminGroupObjectId,
-	[string]$AadDataAdminGroupObjectId
+	[Parameter()]
+	[string]$TemplateParameterFile = '.\main-hub.bicepparam'
 )
 
-$TemplateParameters = @{
-	# REQUIRED
-	location                    = $Location
-	environment                 = $Environment
-	workloadName                = $WorkloadName
-	computeDnsSuffix            = $ComputeDnsSuffix
-	airlockVmLocalAdminPassword = $AirlockVmLocalAdminPassword
-	aadSysAdminGroupObjectId    = $AadSysAdminGroupObjectId
-	aadDataAdminGroupObjectId   = $AadDataAdminGroupObjectId
-
-	# OPTIONAL
-	sequence                    = $Sequence
-	namingConvention            = $NamingConvention
-	tags                        = @{
-		'date-created' = (Get-Date -Format 'yyyy-MM-dd')
-		purpose        = $Environment
-		lifetime       = 'medium'
-		'customer-ref' = 'WCM'
-	}
+# Define common parameters for the New-AzDeployment cmdlet
+[hashtable]$CmdLetParameters = @{
+	TemplateFile = '.\main-hub.bicep'
 }
 
-Select-AzSubscription $HubSubscriptionId -Tenant $TenantId
+# Process the template parameter file and read relevant values for use here
+Write-Verbose "Using template parameter file '$TemplateParameterFile'"
+[string]$TemplateParameterJsonFile = [System.IO.Path]::ChangeExtension($TemplateParameterFile, 'json')
+bicep build-params $TemplateParameterFile --outfile $TemplateParameterJsonFile
 
-$DeploymentResult = New-AzDeployment -Location $Location -Name "$WorkloadName-$Environment-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)" `
-	-TemplateFile ".\main-hub.bicep" -TemplateParameterObject $TemplateParameters
+$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterJsonFile)
+
+# Read the values from the parameters file, to use when generating the $DeploymentName value
+$ParameterFileContents = (Get-Content $TemplateParameterJsonFile | ConvertFrom-Json)
+$WorkloadName = $ParameterFileContents.parameters.workloadName.value
+$Location = $ParameterFileContents.parameters.location.value
+
+# Generate a unique name for the deployment
+[string]$DeploymentName = "$WorkloadName-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)"
+$CmdLetParameters.Add('Name', $DeploymentName)
+
+$CmdLetParameters.Add('Location', $Location)
+
+# Ignore the WhatIfPreference for the subscription selection, otherwise the deployment might indicate that all resources will be created.
+Select-AzSubscription $HubSubscriptionId -Tenant $TenantId -WhatIf:$false
+
+# Execute the deployment
+$DeploymentResult = New-AzDeployment @CmdLetParameters -WhatIf:$WhatIfPreference
 
 if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	# AFTER ACTIONS
@@ -61,7 +57,7 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 
 	[string]$Uri = ('https://management.azure.com/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Storage/storageAccounts/{2}?api-version=2021-04-01' -f $HubSubscriptionId, $airlockResourceGroupName, $storageAccountName);
 
-	Write-Host $storageAccountName ", " $airlockResourceGroupName ", " $tenantId ", " $HubSubscriptionId "," $Uri
+	Write-Host $storageAccountName ", " $airlockResourceGroupName ", " $TenantId ", " $HubSubscriptionId "," $Uri
 
 	$json = @{properties = @{azureFilesIdentityBasedAuthentication = @{directoryServiceOptions = "AADKERB" } } };
 	$json = $json | ConvertTo-Json -Depth 99
@@ -85,7 +81,8 @@ if ($DeploymentResult.ProvisioningState -eq 'Succeeded') {
 	}
 }
 else {
-	$DeploymentResult
-
-	Write-Error -Message "❌ Deployment failed 😢" -ErrorAction Stop
+	if (! $WhatIfPreference) {
+		$DeploymentResult
+		Write-Error -Message "❌ Deployment failed 😢" -ErrorAction Stop
+	}
 }

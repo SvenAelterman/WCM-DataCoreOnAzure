@@ -10,10 +10,7 @@ param projectMemberAadGroupObjectId = ''
 param publicStorageAccountAllowedIPs = []
 
 // This should be simplified in the future
-param vnetOctet2Base = 20
-param vnetOctet2 = vnetOctet2Base + sequence - 1
-param vnetAddressSpace = '10.${vnetOctet2}.0.0/16'
-param subnetAddressSpace = '10.${vnetOctet2}.{octet3}.0/24'
+param vnetAddressSpace = '10.10.0.0/16'
 
 param hubSubscriptionId = ''
 param hubWorkloadName = ''

@@ -12,7 +12,7 @@ param location string
 ])
 param environment string
 param workloadName string
-// Default the short workload name (for name of KV): remove all vowels
+// Default the short workload name: remove all vowels
 @maxLength(10)
 param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 @secure()
@@ -29,8 +29,7 @@ param aadSysAdminGroupObjectId string
 @description('The Entra ID Object ID of the Data Core Data Admins group. Members of this group will have user acccess to the airlock VMs.')
 param aadDataAdminGroupObjectId string
 
-param vnetAddressSpace string = '10.19.0.0/16'
-param subnetAddressSpace string = '10.19.{octet3}.0/24'
+param vnetAddressSpace string
 
 // Optional parameters
 param tags object = {}
@@ -109,52 +108,55 @@ resource subscriptionLoginRbac 'Microsoft.Authorization/roleAssignments@2022-04-
 
 var vnetAbbrev = abbreviationsModule.outputs.abbreviations['Virtual Network']
 
-var hubVNetSubnets = [
+var defaultSubnets = [
   {
     name: 'default'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 0)
     nsgId: ''
     routeTableId: ''
   }
   // LATER: Remove this subnet - should adopt object-based instead of array-based subnet definitions
   {
     name: 'avd'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 3)
     nsgId: ''
     routeTableId: ''
   }
   {
     name: 'data'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '2')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 1)
     nsgId: ''
     routeTableId: ''
   }
   {
     name: 'airlock-compute'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '3')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 2)
     // TODO: Apply NSG, route table to airlock-compute subnet?
     nsgId: ''
     routeTableId: ''
   }
   {
     name: 'AzureFirewallSubnet'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '254')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 26, 1)
     nsgId: ''
     routeTableId: ''
   }
   {
     name: 'AzureFirewallManagementSubnet'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '253')
-    nsgId: ''
-    routeTableId: ''
-  }
-  {
-    name: 'AzureBastionSubnet'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '252')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 26, 2)
     nsgId: ''
     routeTableId: ''
   }
 ]
+
+var bastionSubnet = deployBastionHost ? [ {
+    name: 'AzureBastionSubnet'
+    addressPrefix: cidrSubnet(vnetAddressSpace, 26, 3)
+    nsgId: ''
+    routeTableId: ''
+  } ] : []
+
+var hubVNetSubnets = union(defaultSubnets, bastionSubnet)
 
 module hubVnetModule 'modules/vnet.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'vnet-hub-core')

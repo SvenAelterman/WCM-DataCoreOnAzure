@@ -24,14 +24,7 @@ param projectMemberObjectIds array = []
 
 param publicStorageAccountAllowedIPs array = []
 
-// Provide reasonable defaults for octet 2 of the VNet address space.
-// If the address space parameters are specified, this won't be used.
-param vnetOctet2Base int = 20
-param vnetOctet2 int = vnetOctet2Base + sequence - 1
-
-param vnetAddressSpace string = '10.${vnetOctet2}.0.0/16'
-// {octet3} is a placeholder that will be determined by the subnet deployments
-param subnetAddressSpace string = '10.${vnetOctet2}.{octet3}.0/24'
+param vnetAddressSpace string
 
 param hubSubscriptionId string
 param hubWorkloadName string
@@ -205,14 +198,14 @@ var subnets = [
   {
     // LATER: Consider renaming to 'compute'
     name: 'default'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '0')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 0)
     // TODO: If Bastion is deployed in Hub, allow RDP connections from hub Bastion
     nsgId: defaultNsg.outputs.nsgId
     routeTableId: udrModule.outputs.routeTableId
   }
   {
     name: 'data'
-    addressPrefix: replace(subnetAddressSpace, '{octet3}', '1')
+    addressPrefix: cidrSubnet(vnetAddressSpace, 28, 1)
     nsgId: ''
     routeTableId: ''
   }

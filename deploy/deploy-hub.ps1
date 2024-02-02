@@ -14,7 +14,7 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$TenantId,
 	[Parameter()]
-	[string]$TemplateParameterFile = '.\main-hub.bicepparam'
+	[string]$TemplateParameterFile = 'main-hub.bicepparam'
 )
 
 # Define common parameters for the New-AzDeployment cmdlet

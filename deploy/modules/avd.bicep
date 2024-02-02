@@ -12,6 +12,8 @@ param tags object = {}
 param baseTime string = utcNow('u')
 param deployVmsInSeparateRG bool = true
 
+param vmOnlyTags object
+
 param loginPermissionObjectId string
 param dvuRoleDefinitionId string
 param virtualMachineUserLoginRoleDefinitionId string
@@ -127,6 +129,8 @@ module avdVM 'avd-vmRG.bicep' = {
     virtualMachineUserLoginRoleDefinitionId: virtualMachineUserLoginRoleDefinitionId
 
     overrideVmResourceGroupName: overrideVmResourceGroupName
+
+    vmOnlyTags: vmOnlyTags
   }
 }
 

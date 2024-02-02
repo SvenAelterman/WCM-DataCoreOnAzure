@@ -41,6 +41,8 @@ param deploymentTime string = utcNow()
 param airlockVmHostNameStructure string = 'al-${workloadName}-${sequence}'
 param deployBastionHost bool = true
 
+param vmOnlyTags object = {}
+
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
@@ -270,6 +272,8 @@ module hubAirlockAvdModule 'modules/avd.bicep' = {
     workloadName: subWorkloadNames.airlock
 
     workspaceFriendlyName: 'Data Core Airlock Access'
+
+    vmOnlyTags: vmOnlyTags
   }
 }
 

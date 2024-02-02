@@ -51,6 +51,8 @@ param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-
 param hubNamingConvention string = namingConvention
 param deploymentTime string = utcNow()
 
+param vmOnlyTags object = {}
+
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-${toLower(environment)}-{rtype}-${deploymentTime}'
@@ -566,6 +568,8 @@ module avdModule 'modules/avd.bicep' = {
     loginPermissionObjectId: projectMemberAadGroupObjectId
     dvuRoleDefinitionId: roles.DesktopVirtualizationUser
     virtualMachineUserLoginRoleDefinitionId: roles.VirtualMachineUserLogin
+
+    vmOnlyTags: vmOnlyTags
   }
 }
 

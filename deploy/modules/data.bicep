@@ -45,7 +45,8 @@ module uami 'data/uami.bicep' = {
     location: location
     namingStructure: namingStructure
     subwloadname: workspaceName
-    roles: roles
+    // TODO: Limit roles
+    roles: toObject(filter(items(roles), role => !contains(role.key, ' ')), item => item.key, item => item.value)
     tags: tags
   }
 }

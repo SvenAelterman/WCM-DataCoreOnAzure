@@ -16,14 +16,14 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$TenantId,
 	[Parameter()]
-	[string]$TemplateParameterFile = '.\main-prj.bicepparam'
+	[string]$TemplateParameterFile = 'main-prj.bicepparam'
 )
 
 Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
 
 # Define common parameters for the New-AzDeployment cmdlet
 [hashtable]$CmdLetParameters = @{
-	TemplateFile           = '.\main-prj.bicep'
+	TemplateFile           = 'main-prj.bicep'
 	projectMemberObjectIds = $ProjectTransitiveMembers
 }
 

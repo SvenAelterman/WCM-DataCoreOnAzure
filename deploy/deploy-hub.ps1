@@ -19,7 +19,7 @@ Param(
 
 # Define common parameters for the New-AzDeployment cmdlet
 [hashtable]$CmdLetParameters = @{
-	TemplateFile = '.\main-hub.bicep'
+	TemplateFile = 'main-hub.bicep'
 }
 
 # Process the template parameter file and read relevant values for use here

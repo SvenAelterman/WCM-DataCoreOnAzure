@@ -14,7 +14,7 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2018-
 
 // assign roles to the uami for post deployment tasks
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2020-10-01-preview' = [for r in items(roles): {
-  name: guid('rbac-${managedIdentity.name}-${r.key}')
+  name: guid(resourceGroup().id, managedIdentity.name, r.value)
   properties: {
     roleDefinitionId: r.value
     principalId: managedIdentity.properties.principalId

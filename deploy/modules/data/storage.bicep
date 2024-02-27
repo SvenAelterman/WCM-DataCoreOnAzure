@@ -62,7 +62,8 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
     publicNetworkAccess: privatize ? 'Disabled' : 'Enabled'
     accessTier: 'Hot'
     networkAcls: {
-      bypass: 'AzureServices'
+      // 2024-02-26: Public storage account requires Bypass for Data Factory trigger to start
+      bypass: privatize ? 'None' : 'AzureServices'
       // This controls the "Enabled from all networks" radio button for the public endpoint
       // Default deny if account is private, has a list of allowed IPs, or has resource access rules
       // Note: Bypass and Resource Access Rules still take priority over this

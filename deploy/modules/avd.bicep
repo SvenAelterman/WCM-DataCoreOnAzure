@@ -69,10 +69,10 @@ resource desktopApplicationGroup 'Microsoft.DesktopVirtualization/applicationGro
   }
 }
 
-resource sessionDesktop 'Microsoft.DesktopVirtualization/applicationGroups/desktops@2023-09-05' existing = {
-  name: 'SessionDesktop'
-  parent: desktopApplicationGroup
-}
+// resource sessionDesktop 'Microsoft.DesktopVirtualization/applicationGroups/desktops@2023-09-05' existing = {
+//   name: 'SessionDesktop'
+//   parent: desktopApplicationGroup
+// }
 
 // LATER: Execute deployment script for Update-AzWvdDesktop -ResourceGroupName rg-wcmprj-avd-demo-eastus-02 -ApplicationGroupName ag-wcmprj-avd-demo-eastus-02 -Name SessionDesktop -FriendlyName Test
 

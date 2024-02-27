@@ -106,7 +106,7 @@ module publicStorageAccountModule 'data/storage.bicep' = {
     ]
     privatize: false
     allowedIpAddresses: publicStorageAccountAllowedIPs
-    tags: tags
+    tags: union(tags, { 'hidden-title': 'External/Public Storage Account' })
   }
 }
 

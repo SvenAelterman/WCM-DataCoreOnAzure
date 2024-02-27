@@ -32,9 +32,9 @@ param hubWorkloadName string
 @maxLength(10)
 param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(hubWorkloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 
-// LATER: Deploy research VM in this spoke if true
-#disable-next-line no-unused-params
-param deployResearchVm bool = false
+// // LATER: Deploy research VM in this spoke if true
+// #disable-next-line no-unused-params
+// param deployResearchVm bool = false
 
 param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
 
@@ -146,10 +146,10 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12
   scope: coreHubResourceGroup
 }
 
-resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
-  name: hubVNetName
-  scope: coreHubResourceGroup
-}
+// resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
+//   name: hubVNetName
+//   scope: coreHubResourceGroup
+// }
 
 // The existing Private DNS zones for the storage account sub-resources
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing = [for subresource in storageAccountSubResourcePrivateEndpoints: {
@@ -173,7 +173,7 @@ module defaultNsg 'modules/nsg-prj.bicep' = {
   params: {
     location: location
     namingStructure: coreNamingStructure
-    avdSubnetRange: hubVNet.properties.subnets[1].properties.addressPrefix
+    //avdSubnetRange: hubVNet.properties.subnets[1].properties.addressPrefix
   }
 }
 
@@ -318,7 +318,7 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
       containerNames.exportRequest
     ]
     subnetId: vNetModule.outputs.subnetIds[1]
-    tags: tags
+    tags: union(tags, { 'hidden-title': 'Private Storage Account' })
     // The list of file shares to create in this storage account
     fileShareNames: actualProjectFileShareNames
     privateEndpointInfo: peInfo
@@ -368,7 +368,7 @@ var roles = rolesModule.outputs.roles
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
 module keyVaultShortNameModule 'common-modules/shortname.bicep' = {
-  name: 'keyVaultShortName'
+  name: take(replace(deploymentNameStructure, '{rtype}', 'kv-shortname'), 64)
   scope: corePrjResourceGroup
   params: {
     location: location
@@ -409,7 +409,7 @@ module privateStorageAccountConnStringSecretModule 'modules/keyVault-StorageAcco
 // Create air lock/drawbridge for data move (dataAutomationModule)
 // First, create a name for the public storage account which will be created by the dataAutomationModule
 module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
-  name: 'publicStorageAccountShortName'
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-pub-name'), 64)
   // The public storage account will be created in the data resource group
   // But where we generate the name doesn't matter
   scope: corePrjResourceGroup
@@ -449,7 +449,7 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
 // Get the name of the hub's Key Vault
 // LATER: Take as an input parameter instead
 module hubKeyVaultShortNameModule 'common-modules/shortname.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'kv-shortname')
+  name: replace(deploymentNameStructure, '{rtype}', 'kv-hub-shortname')
   scope: coreHubResourceGroup
   params: {
     location: location

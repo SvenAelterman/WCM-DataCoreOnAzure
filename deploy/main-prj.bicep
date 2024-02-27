@@ -440,7 +440,7 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
     location: location
     namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubAirlock, 1))
     resourceType: 'st'
-    sequence: sequence
+    sequence: hubSequence
     workloadName: hubWorkloadName
     removeHyphens: true
   }

@@ -38,7 +38,7 @@ param shortHubWorkloadName string = take(replace(replace(replace(replace(replace
 
 param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
 
-// TODO: Rename AAD to EntraId
+// LATER: Rename AAD to EntraId
 @description('The Entra ID Object ID of the Data Core Sysadmins group. Members of this group will have Administrator acccess to the airlock VMs.')
 param aadSysAdminGroupObjectId string
 
@@ -424,9 +424,10 @@ module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
+var hubAirlockResourceGroupName = replace(hubAirlockNamingStructure, '{rtype}', 'rg')
 // Reference the existing hub's airlock resource group
 resource airlockHubRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: replace(hubAirlockNamingStructure, '{rtype}', 'rg')
+  name: hubAirlockResourceGroupName
   scope: subscription(hubSubscriptionId)
 }
 
@@ -491,6 +492,8 @@ module dataAutomationModule 'modules/data.bicep' = {
     projectMemberAadGroupObjectId: projectMemberAadGroupObjectId
 
     fileShareNames: fileShareNames
+
+    airlockStorageAccountId: resourceId(hubSubscriptionId, hubAirlockResourceGroupName, 'Microsoft.Storage/storageAccounts', airlockStorageAccountNameModule.outputs.shortName)
   }
 }
 

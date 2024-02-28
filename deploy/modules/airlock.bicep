@@ -51,8 +51,6 @@ module airlockStorageModule 'data/storage.bicep' = {
   }
 }
 
-// TODO: Create entry in hub Key Vault for connection string
-
 // TODO: Deploy RBAC for storage account (data admins)
 
 output storageAccountName string = airlockStorageModule.outputs.storageAccountName

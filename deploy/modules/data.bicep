@@ -11,11 +11,15 @@ param roles object
 param keyVaultName string
 param keyVaultResourceGroupName string
 param privateStorageAccountConnStringSecretName string
+
+param airlockStorageAccountId string
 param airlockStorageAccountName string
 param airlockFileShareName string
+
 param hubKeyVaultName string
 param hubKeyVaultResourceGroupName string
 param hubSubscriptionId string
+
 param publicStorageAccountAllowedIPs array = []
 param projectMemberAadGroupObjectId string
 
@@ -53,7 +57,7 @@ module uami 'data/uami.bicep' = {
 
 // Azure Data Factory resource and contents
 module adfModule 'data/adf.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'adf')
+  name: take(replace(deploymentNameStructure, '{rtype}', 'adf'), 64)
   params: {
     namingStructure: namingStructure
     location: location
@@ -67,7 +71,16 @@ module adfModule 'data/adf.bicep' = {
   }
 }
 
-// TODO: Grant ADF managed identity access to hub's KV to retrieve secrets
+// Grant ADF managed identity access to hub's KV to retrieve secrets
+module adfHubKvRoleAssignment '../common-modules/roleAssignments/roleAssignment-kv.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'adf-rbac-hubkv'), 64)
+  scope: hubKvRg
+  params: {
+    kvName: hubKeyVaultName
+    principalId: adfModule.outputs.principalId
+    roleDefinitionId: roles.KeyVaultSecretsUser
+  }
+}
 
 // Logic app for export review (moves file to airlock and sends approval email)
 module logicAppModule 'data/logicApp.bicep' = {
@@ -169,15 +182,26 @@ module ingestTriggerModule 'data/adfTrigger.bicep' = {
 }
 
 module adfManagedPrivateEndpointModule 'data/adfManagedPrivateEndpoint.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'adf-pep')
+  name: take(replace(deploymentNameStructure, '{rtype}', 'adf-pep'), 64)
   params: {
     adfName: adfModule.outputs.name
-    privateStorageAccountId: privateStorageAccount.id
-    privateStorageAccountName: privateStorageAccountName
+    storageAccountId: privateStorageAccount.id
+    storageAccountName: privateStorageAccountName
   }
 }
 
-// TODO: Create managed private endpoint for airlock storage account
+// Create a private endpoint for the hub's airlock storage account file endpoint
+module adfHubAirlockManagedPrivateEndpointModule 'data/adfManagedPrivateEndpoint.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'adf-pep-hub'), 64)
+  params: {
+    adfName: adfModule.outputs.name
+    storageAccountId: airlockStorageAccountId
+    storageAccountName: airlockStorageAccountName
+    privateEndpointGroupIDs: [ 'file' ]
+  }
+}
+
+// TODO: 2024-02-28: Approval for hub airlock managed private endpoint
 
 // Deployment script for post deployment tasks
 // * Start the triggers in the ADF

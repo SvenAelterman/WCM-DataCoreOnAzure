@@ -32,10 +32,6 @@ param hubWorkloadName string
 @maxLength(10)
 param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(hubWorkloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 
-// // LATER: Deploy research VM in this spoke if true
-// #disable-next-line no-unused-params
-// param deployResearchVm bool = false
-
 param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
 
 // LATER: Rename AAD to EntraId
@@ -146,11 +142,6 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12
   scope: coreHubResourceGroup
 }
 
-// resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
-//   name: hubVNetName
-//   scope: coreHubResourceGroup
-// }
-
 // The existing Private DNS zones for the storage account sub-resources
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing = [for subresource in storageAccountSubResourcePrivateEndpoints: {
   name: 'privatelink.${subresource}.${az.environment().suffixes.storage}'
@@ -173,7 +164,6 @@ module defaultNsg 'modules/nsg-prj.bicep' = {
   params: {
     location: location
     namingStructure: coreNamingStructure
-    //avdSubnetRange: hubVNet.properties.subnets[1].properties.addressPrefix
   }
 }
 

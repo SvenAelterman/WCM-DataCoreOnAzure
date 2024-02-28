@@ -24,7 +24,6 @@ Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
 # Define common parameters for the New-AzDeployment cmdlet
 [hashtable]$CmdLetParameters = @{
 	TemplateFile = 'main-prj.bicep'
-	#	projectMemberObjectIds = $ProjectTransitiveMembers
 }
 
 # Process the template parameter file and read relevant values for use here

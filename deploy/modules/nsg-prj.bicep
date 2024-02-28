@@ -4,7 +4,6 @@
 
 param namingStructure string
 param location string
-//param avdSubnetRange string
 
 // TODO: Define securityRules in JSON content file
 var securityRules = [

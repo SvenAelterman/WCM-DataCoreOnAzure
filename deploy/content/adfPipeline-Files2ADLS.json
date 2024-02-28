@@ -45,7 +45,7 @@
                         "type": "Expression"
                     },
                     "folderPath": {
-                        "value": "@pipeline().parameters.sourceFolderPath",
+                        "value": "@concat(pipeline().parameters.sourceFolderPath, '/export-request')",
                         "type": "Expression"
                     },
                     "fileShareName": {

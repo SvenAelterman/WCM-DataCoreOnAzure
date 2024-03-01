@@ -47,6 +47,8 @@ param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-
 param hubNamingConvention string = namingConvention
 param deploymentTime string = utcNow()
 
+param azureBastionSubnetAddressPrefix string = '255.255.255.255/32'
+
 param vmOnlyTags object = {}
 
 // Variables
@@ -164,6 +166,7 @@ module defaultNsg 'modules/nsg-prj.bicep' = {
   params: {
     location: location
     namingStructure: coreNamingStructure
+    bastionAddressPrefix: azureBastionSubnetAddressPrefix
   }
 }
 

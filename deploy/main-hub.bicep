@@ -97,6 +97,7 @@ resource airlockHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01'
   tags: tags
 }
 
+// TODO: Remove hardcoded GUID for role definition
 // Enable sysadmins to log on to all VMs in the subscription
 resource subscriptionLoginRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aadDataAdminGroupObjectId, subscription().id, '1c0163c0-47e6-4577-8991-ea5c82e286e4')

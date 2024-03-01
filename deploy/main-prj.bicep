@@ -49,6 +49,11 @@ param deploymentTime string = utcNow()
 
 param azureBastionSubnetAddressPrefix string = '255.255.255.255/32'
 
+@secure()
+param vmLocalUsername string
+@secure()
+param vmLocalPassword string
+
 param vmOnlyTags object = {}
 
 // Variables
@@ -577,6 +582,9 @@ module avdModule 'modules/avd.bicep' = {
     virtualMachineUserLoginRoleDefinitionId: roles.VirtualMachineUserLogin
 
     vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: vmLocalUsername
+    sessionHostLocalPassword: vmLocalPassword
   }
 }
 

@@ -24,3 +24,10 @@ param hubNamingConvention = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq
 param namingConvention = hubNamingConvention
 
 param azureBastionSubnetAddressPrefix = '10.19.0.192/26'
+
+var kvSubscriptionId = hubSubscriptionId
+var kvResourceGroupName = ''
+var kvName = ''
+
+param vmLocalUsername = az.getSecret(kvSubscriptionId, kvResourceGroupName, kvName, 'sessionHostLocalUsername')
+param vmLocalPassword = az.getSecret(kvSubscriptionId, kvResourceGroupName, kvName, 'sessionHostLocalPassword')

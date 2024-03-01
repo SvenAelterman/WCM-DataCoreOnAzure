@@ -43,6 +43,11 @@ param deployBastionHost bool = true
 
 param vmOnlyTags object = {}
 
+@secure()
+param vmLocalUsername string
+@secure()
+param vmLocalPassword string
+
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
@@ -275,6 +280,9 @@ module hubAirlockAvdModule 'modules/avd.bicep' = {
     workspaceFriendlyName: 'Data Core Airlock Access'
 
     vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: vmLocalUsername
+    sessionHostLocalPassword: vmLocalPassword
   }
 }
 

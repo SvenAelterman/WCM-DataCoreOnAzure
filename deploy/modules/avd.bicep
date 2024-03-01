@@ -20,6 +20,11 @@ param virtualMachineUserLoginRoleDefinitionId string
 
 param overrideVmResourceGroupName string = ''
 
+@secure()
+param sessionHostLocalUsername string
+@secure()
+param sessionHostLocalPassword string
+
 param usePrivateLinkForHostPool bool = true
 param privateEndpointSubnetId string
 param privateLinkDnsZoneId string
@@ -112,6 +117,9 @@ module avdVM 'avd-vmRG.bicep' = {
     overrideVmResourceGroupName: overrideVmResourceGroupName
 
     vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: sessionHostLocalUsername
+    sessionHostLocalPassword: sessionHostLocalPassword
   }
 }
 

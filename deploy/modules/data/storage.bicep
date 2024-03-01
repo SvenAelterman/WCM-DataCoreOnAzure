@@ -44,7 +44,7 @@ var ipRules = [for ipAddress in allowedIpAddresses: {
   action: 'Allow'
 }]
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
   kind: 'StorageV2'
@@ -61,9 +61,14 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
     supportsHttpsTrafficOnly: true
     publicNetworkAccess: privatize ? 'Disabled' : 'Enabled'
     accessTier: 'Hot'
+    encryption: {
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: true
+    }
     networkAcls: {
       // 2024-02-26: Public storage account requires Bypass for Data Factory trigger to start
-      bypass: privatize ? 'None' : 'AzureServices'
+      // 2024-03-01: Per NIST 800-53 R5 AC-17(1), should allow bypass for Azure Services
+      bypass: 'AzureServices'
       // This controls the "Enabled from all networks" radio button for the public endpoint
       // Default deny if account is private, has a list of allowed IPs, or has resource access rules
       // Note: Bypass and Resource Access Rules still take priority over this

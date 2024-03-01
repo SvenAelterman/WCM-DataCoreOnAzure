@@ -82,7 +82,7 @@ var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', take
 var regionNameMap = loadJsonContent('content/regionNameMap.jsonc')
 
 // Naming structure only needs the resource type ({rtype}) replaced
-var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.core)
 var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.data)
 var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.compute)

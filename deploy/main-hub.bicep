@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 @allowed([
-  'eastus2'
+  'westus'
   'eastus'
 ])
 param location string
@@ -15,9 +15,6 @@ param workloadName string
 // Default the short workload name: remove all vowels
 @maxLength(10)
 param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
-@secure()
-#disable-next-line no-unused-params
-param airlockVmLocalAdminPassword string // Keeping this unused parameter for future use with Key Vault secrets
 
 // Create private DNS zone with this name
 param computeDnsSuffix string
@@ -48,6 +45,8 @@ param vmLocalUsername string
 @secure()
 param vmLocalPassword string
 
+var regionNameMap = loadJsonContent('content/regionNameMap.jsonc')
+
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
@@ -66,7 +65,7 @@ var subWorkloadNames = {
 }
 
 // Naming structure only needs the resource type ({rtype}) replaced
-var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.core)
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.avd)
 var airlockNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.airlock)

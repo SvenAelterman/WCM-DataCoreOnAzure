@@ -3,8 +3,7 @@ using './main-hub.bicep'
 param location = 'eastus'
 param environment = 'Test'
 param workloadName = ''
-// Recommend using a Key Vault reference: az.
-param airlockVmLocalAdminPassword = ''
+
 param computeDnsSuffix = ''
 param aadSysAdminGroupObjectId = ''
 param aadDataAdminGroupObjectId = ''

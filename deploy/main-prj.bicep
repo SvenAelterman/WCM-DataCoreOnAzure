@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 @allowed([
-  'eastus2'
+  'westus'
   'eastus'
 ])
 param location string
@@ -79,6 +79,8 @@ var subWorkloadNames = {
 // LATER: Storage account names should use short naming convention
 var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', take(subWorkloadNames.core, 1))
 
+var regionNameMap = loadJsonContent('content/regionNameMap.jsonc')
+
 // Naming structure only needs the resource type ({rtype}) replaced
 var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.core)
@@ -88,8 +90,8 @@ var avdNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkl
 
 // Names of hub resources [The hub is deployed from main-hub.bicep before deploying project resources.]
 var hubSequenceFormatted = format('{0:00}', hubSequence)
-var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
-var hubAirlockNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'airlock')
+var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
+var hubAirlockNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'airlock')
 var hubVNetName = replace(hubCoreNamingStructure, '{rtype}', 'vnet')
 var hubFwName = replace(hubCoreNamingStructure, '{rtype}', 'fw')
 

@@ -123,6 +123,16 @@ module publicStorageAccountModule 'data/storage.bicep' = {
   }
 }
 
+// Grant reader access for researchers so they can see the account in Storage Explorer
+module publicStorageAccountRbacModule '../common-modules/roleAssignments/roleAssignment-st.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-pub-rbac'), 64)
+  params: {
+    principalId: projectMemberAadGroupObjectId
+    roleDefinitionId: roles.Reader
+    storageAccountName: publicStorageAccountModule.outputs.storageAccountName
+  }
+}
+
 // Setup System Event Grid Topic for public storage account. We only do this here to control the name of the event grid topic
 module eventGridForPublicModule 'data/eventGrid.bicep' = {
   name: replace(deploymentNameStructure, '{rtype}', 'evgt-public')

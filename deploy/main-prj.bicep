@@ -322,6 +322,17 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
   }
 }
 
+// Grant the researchers Reader access to the storage account so it's listed in Storage Explorer
+module privateStorageAccountRbacModule 'common-modules/roleAssignments/roleAssignment-st.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-rbac'), 64)
+  scope: dataPrjResourceGroup
+  params: {
+    storageAccountName: privateStorageAccountModule.outputs.storageAccountName
+    principalId: projectMemberAadGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles.Reader
+  }
+}
+
 // Assign permissions to the file shares to specified group object IDs
 module incomingFileShareRbacModule 'common-modules/roleAssignments/roleAssignment-st-fs.bicep' = {
   name: take(replace(deploymentNameStructure, '{rtype}', 'st-fs-incoming-rbac'), 64)

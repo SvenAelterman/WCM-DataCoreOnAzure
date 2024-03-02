@@ -35,10 +35,7 @@ var Defs = {
   }
 }
 
-var shortLocations = {
-  eastus: 'eus'
-  eastus2: 'eus2'
-}
+var shortLocations = loadJsonContent('../content/regionNameMap.jsonc')
 
 var maxLength = Defs[resourceType].maxLength
 var lowerCase = Defs[resourceType].lowerCase

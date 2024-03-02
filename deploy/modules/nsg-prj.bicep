@@ -4,7 +4,7 @@
 
 param namingStructure string
 param location string
-param avdSubnetRange string
+param bastionAddressPrefix string
 
 // TODO: Define securityRules in JSON content file
 var securityRules = [
@@ -21,6 +21,19 @@ var securityRules = [
   //     destinationPortRange: '3389'
   //   }
   // }
+  {
+    name: 'Allow_RDPFromBastion'
+    properties: {
+      direction: 'Inbound'
+      priority: 205
+      protocol: 'TCP'
+      access: 'Allow'
+      sourceAddressPrefix: bastionAddressPrefix
+      sourcePortRange: '*'
+      destinationAddressPrefix: 'VirtualNetwork'
+      destinationPortRange: '3389'
+    }
+  }
   {
     name: 'Allow_AzureUpdateDelivery'
     properties: {

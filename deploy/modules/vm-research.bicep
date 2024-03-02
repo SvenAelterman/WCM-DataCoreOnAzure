@@ -16,6 +16,8 @@ param osDiskDeleteOption string = 'Delete'
 param nicDeleteOption string = 'Delete'
 param virtualMachineSize string = 'Standard_D2s_v4'
 
+param vmOnlyTags object
+
 param imageReference object = {
   publisher: 'microsoftwindowsdesktop'
   offer: 'windows-11'
@@ -108,7 +110,7 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2022-03-01' = {
     }
     licenseType: 'Windows_Client'
   }
-  tags: tags
+  tags: union(tags, vmOnlyTags)
   identity: {
     type: 'SystemAssigned'
   }

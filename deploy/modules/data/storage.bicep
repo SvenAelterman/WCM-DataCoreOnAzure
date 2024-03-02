@@ -19,27 +19,32 @@ param allowedIpAddresses array = []
 var assignRole = !empty(principalIds)
 var baseName = !empty(subwloadname) ? replace(namingStructure, '{subwloadname}', subwloadname) : replace(namingStructure, '-{subwloadname}', '')
 
-var resourceAccessRules = !privatize ? [
+// TODO: Improve resource access rules by provide specific resource names instead of allowing all in resource group
+var defaultResourceAccessRules = [
   // Allow access from any Data Factory in the same resource group
   {
     tenantId: subscription().tenantId
     resourceId: resourceId(subscription().subscriptionId, resourceGroup().name, 'Microsoft.DataFactory/factories', '*')
   }
   // TODO: Add rule for EventGrid?
-] : [
+]
+
+var specialResourceAccessRules = privatize ? [
   // Enclave (private) storage account needs to allow the Logic App access to trigger the workflow
   {
     tenantId: subscription().tenantId
     resourceId: resourceId(subscription().subscriptionId, resourceGroup().name, 'Microsoft.Logic/workflows', '*')
   }
-]
+] : []
+
+var resourceAccessRules = union(defaultResourceAccessRules, specialResourceAccessRules)
 
 var ipRules = [for ipAddress in allowedIpAddresses: {
   value: ipAddress
   action: 'Allow'
 }]
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
   kind: 'StorageV2'
@@ -56,17 +61,24 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-09-01' = {
     supportsHttpsTrafficOnly: true
     publicNetworkAccess: privatize ? 'Disabled' : 'Enabled'
     accessTier: 'Hot'
+    encryption: {
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: true
+    }
     networkAcls: {
-      bypass: 'None'
+      // 2024-02-26: Public storage account requires Bypass for Data Factory trigger to start
+      // 2024-03-01: Per NIST 800-53 R5 AC-17(1), should allow bypass for Azure Services
+      bypass: 'AzureServices'
       // This controls the "Enabled from all networks" radio button for the public endpoint
-      // Deny all networks if account is private, has a list of allowed IPs, or has resource access rules
+      // Default deny if account is private, has a list of allowed IPs, or has resource access rules
+      // Note: Bypass and Resource Access Rules still take priority over this
       defaultAction: privatize || length(allowedIpAddresses) > 0 || length(resourceAccessRules) > 0 ? 'Deny' : 'Allow' // force deny inbound traffic
       // Do not add public access point IP rules if the storage account must be private
       ipRules: !privatize ? ipRules : []
       // Do not integrate via vnet due to service delegation requirements
       virtualNetworkRules: []
       // Do not add resource access rules if the storage account must be private
-      resourceAccessRules: !privatize ? resourceAccessRules : []
+      resourceAccessRules: resourceAccessRules
     }
   }
   tags: tags

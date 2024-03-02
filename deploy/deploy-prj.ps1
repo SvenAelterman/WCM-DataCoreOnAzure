@@ -16,15 +16,14 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$TenantId,
 	[Parameter()]
-	[string]$TemplateParameterFile = '.\main-prj.bicepparam'
+	[string]$TemplateParameterFile = 'main-prj.bicepparam'
 )
 
 Connect-MgGraph -Scopes "Group.Read.All" -NoWelcome
 
 # Define common parameters for the New-AzDeployment cmdlet
 [hashtable]$CmdLetParameters = @{
-	TemplateFile           = '.\main-prj.bicep'
-	projectMemberObjectIds = $ProjectTransitiveMembers
+	TemplateFile = 'main-prj.bicep'
 }
 
 # Process the template parameter file and read relevant values for use here
@@ -32,7 +31,8 @@ Write-Verbose "Using template parameter file '$TemplateParameterFile'"
 [string]$TemplateParameterJsonFile = [System.IO.Path]::ChangeExtension($TemplateParameterFile, 'json')
 bicep build-params $TemplateParameterFile --outfile $TemplateParameterJsonFile
 
-$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterJsonFile)
+# Send the .bicepparam file to the deployment, in case the JSON conversion fails, we won't use an old file
+$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterFile)
 
 # Read the values from the parameters file, to use when generating the $DeploymentName value
 $ParameterFileContents = (Get-Content $TemplateParameterJsonFile | ConvertFrom-Json)
@@ -48,6 +48,8 @@ $ProjectAadGroupObjectId = $ParameterFileContents.parameters.projectMemberAadGro
 	ConvertTo-Json | ConvertFrom-Json -AsHashTable
 
 Write-Verbose "Project member count: $($ProjectTransitiveMembers.Length)"
+
+$CmdLetParameters.Add('projectMemberObjectIds', $ProjectTransitiveMembers)
 
 # Generate a unique name for the deployment
 [string]$DeploymentName = "$WorkloadName-$(Get-Date -Format 'yyyyMMddThhmmssZ' -AsUTC)"

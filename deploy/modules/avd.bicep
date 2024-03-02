@@ -12,11 +12,18 @@ param tags object = {}
 param baseTime string = utcNow('u')
 param deployVmsInSeparateRG bool = true
 
+param vmOnlyTags object
+
 param loginPermissionObjectId string
 param dvuRoleDefinitionId string
 param virtualMachineUserLoginRoleDefinitionId string
 
 param overrideVmResourceGroupName string = ''
+
+@secure()
+param sessionHostLocalUsername string
+@secure()
+param sessionHostLocalPassword string
 
 param usePrivateLinkForHostPool bool = true
 param privateEndpointSubnetId string
@@ -67,11 +74,6 @@ resource desktopApplicationGroup 'Microsoft.DesktopVirtualization/applicationGro
   }
 }
 
-resource sessionDesktop 'Microsoft.DesktopVirtualization/applicationGroups/desktops@2023-09-05' existing = {
-  name: 'SessionDesktop'
-  parent: desktopApplicationGroup
-}
-
 // LATER: Execute deployment script for Update-AzWvdDesktop -ResourceGroupName rg-wcmprj-avd-demo-eastus-02 -ApplicationGroupName ag-wcmprj-avd-demo-eastus-02 -Name SessionDesktop -FriendlyName Test
 
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -82,20 +84,6 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalId: loginPermissionObjectId
   }
 }
-
-// resource app 'Microsoft.DesktopVirtualization/applicationGroups/applications@2023-09-05' = {
-//   name: 'Remote Desktop'
-//   parent: applicationGroup
-//   properties: {
-//     commandLineSetting: 'DoNotAllow'
-//     applicationType: 'InBuilt'
-//     friendlyName: 'Remote Desktop'
-//     filePath: 'C:\\Windows\\System32\\mstsc.exe'
-//     iconPath: 'C:\\Windows\\System32\\mstsc.exe'
-//     iconIndex: 0
-//     showInPortal: true
-//   }
-// }
 
 resource workspace 'Microsoft.DesktopVirtualization/workspaces@2023-09-05' = {
   name: replace(avdNamingStructure, '{rtype}', abbreviations['AVD Workspace'])
@@ -127,6 +115,11 @@ module avdVM 'avd-vmRG.bicep' = {
     virtualMachineUserLoginRoleDefinitionId: virtualMachineUserLoginRoleDefinitionId
 
     overrideVmResourceGroupName: overrideVmResourceGroupName
+
+    vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: sessionHostLocalUsername
+    sessionHostLocalPassword: sessionHostLocalPassword
   }
 }
 

@@ -1,0 +1,53 @@
+[
+  {
+    "ruleCollectionType": "FirewallPolicyFilterRuleCollection",
+    "action": {
+      "type": "Allow"
+    },
+    "rules": [
+      {
+        "ruleType": "ApplicationRule",
+        "name": "DuoMFA",
+        "protocols": [
+          {
+            "protocolType": "Https",
+            "port": 443
+          }
+        ],
+        "fqdnTags": [],
+        "webCategories": [],
+        "targetFqdns": [
+          "api-3a4f93f4.duosecurity.com",
+          "us.azureauth.duosecurity.com",
+          "ux-asset-commercial.duosecurity.com"
+        ],
+        "targetUrls": [],
+        "terminateTLS": false,
+        "sourceAddresses": ["*"],
+        "destinationAddresses": [],
+        "sourceIpGroups": []
+      }
+      // ,
+      // {
+      //   "ruleType": "ApplicationRule",
+      //   "name": "CrowdStrike",
+      //   "protocols": [
+      //     {
+      //       "protocolType": "Https",
+      //       "port": 443
+      //     }
+      //   ],
+      //   "fqdnTags": [],
+      //   "webCategories": [],
+      //   "targetFqdns": ["*.crowdstrike.com"],
+      //   "targetUrls": [],
+      //   "terminateTLS": false,
+      //   "sourceAddresses": ["*"],
+      //   "destinationAddresses": [],
+      //   "sourceIpGroups": []
+      // }
+    ],
+    "name": "ThirdPartySecurityServices",
+    "priority": 100
+  }
+]

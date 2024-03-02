@@ -15,11 +15,19 @@ param vnetAddressSpace = '10.10.0.0/16'
 param hubSubscriptionId = ''
 param hubWorkloadName = ''
 param shortHubWorkloadName = ''
-param deployResearchVm = false
 param avdVmHostNameStructure = 'vm-${workloadName}${sequence}'
 param aadSysAdminGroupObjectId = ''
 param tags = {}
-param sequence = 3
-param hubSequence = 3
+param sequence = 1
+param hubSequence = 1
 param hubNamingConvention = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param namingConvention = hubNamingConvention
+
+param azureBastionSubnetAddressPrefix = '10.19.0.192/26'
+
+var kvSubscriptionId = hubSubscriptionId
+var kvResourceGroupName = ''
+var kvName = ''
+
+param vmLocalUsername = az.getSecret(kvSubscriptionId, kvResourceGroupName, kvName, 'sessionHostLocalUsername')
+param vmLocalPassword = az.getSecret(kvSubscriptionId, kvResourceGroupName, kvName, 'sessionHostLocalPassword')

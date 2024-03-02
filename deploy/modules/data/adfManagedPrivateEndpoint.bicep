@@ -1,17 +1,17 @@
 param adfName string
-param privateStorageAccountId string
-param privateStorageAccountName string
+param storageAccountId string
+param storageAccountName string
 
-var privateEndpointGroupIDs = [
+param privateEndpointGroupIDs array = [
   'dfs'
   'file'
 ]
 
 // LATER: Hardcoded managed VNet name ('default')
 resource privateEndpoint 'Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints@2018-06-01' = [for groupId in privateEndpointGroupIDs: {
-  name: '${adfName}/default/pe-${privateStorageAccountName}-${groupId}'
+  name: '${adfName}/default/pe-${storageAccountName}-${groupId}'
   properties: {
-    privateLinkResourceId: privateStorageAccountId
+    privateLinkResourceId: storageAccountId
     groupId: groupId
   }
 }]

@@ -47,11 +47,9 @@ module airlockStorageModule 'data/storage.bicep' = {
       dnsZoneId: privateDnsZones[i].zoneId
       dnsZoneName: privateDnsZones[i].zoneName
     }]
-    tags: tags
+    tags: union(tags, { 'hidden-title': 'Airlock Storage Account' })
   }
 }
-
-// TODO: Create entry in hub Key Vault for connection string
 
 // TODO: Deploy RBAC for storage account (data admins)
 

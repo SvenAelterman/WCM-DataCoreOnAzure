@@ -9,6 +9,13 @@ param avdSubnetId string
 
 param vmCount int = 1
 
+param vmOnlyTags object
+
+@secure()
+param sessionHostLocalUsername string
+@secure()
+param sessionHostLocalPassword string
+
 // Use the same VM templates as used by the Add VM to hostpool process
 #disable-next-line no-hardcoded-env-urls
 var nestedTemplatesLocation = 'https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/armtemplates/Hostpool_12-9-2021/nestedTemplates/'
@@ -80,10 +87,10 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
       }
       // TODO: Pull from deployment time KeyVault!
       vmAdministratorAccountUsername: {
-        value: 'AzureUser'
+        value: sessionHostLocalUsername
       }
       vmAdministratorAccountPassword: {
-        value: 'Test1234'
+        value: sessionHostLocalPassword
       }
       administratorAccountUsername: {
         value: ''
@@ -129,6 +136,9 @@ resource vmDeployment 'Microsoft.Resources/deployments@2021-04-01' = {
       }
       vmImageVhdUri: {
         value: ''
+      }
+      virtualMachineTags: {
+        value: vmOnlyTags
       }
     }
   }

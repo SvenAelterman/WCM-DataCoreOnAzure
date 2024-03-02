@@ -14,12 +14,12 @@ Param(
 	[Parameter(Mandatory)]
 	[string]$TenantId,
 	[Parameter()]
-	[string]$TemplateParameterFile = '.\main-hub.bicepparam'
+	[string]$TemplateParameterFile = 'main-hub.bicepparam'
 )
 
 # Define common parameters for the New-AzDeployment cmdlet
 [hashtable]$CmdLetParameters = @{
-	TemplateFile = '.\main-hub.bicep'
+	TemplateFile = 'main-hub.bicep'
 }
 
 # Process the template parameter file and read relevant values for use here
@@ -27,7 +27,8 @@ Write-Verbose "Using template parameter file '$TemplateParameterFile'"
 [string]$TemplateParameterJsonFile = [System.IO.Path]::ChangeExtension($TemplateParameterFile, 'json')
 bicep build-params $TemplateParameterFile --outfile $TemplateParameterJsonFile
 
-$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterJsonFile)
+# Send the .bicepparam file to the deployment, in case the JSON conversion fails, we won't use an old file
+$CmdLetParameters.Add('TemplateParameterFile', $TemplateParameterFile)
 
 # Read the values from the parameters file, to use when generating the $DeploymentName value
 $ParameterFileContents = (Get-Content $TemplateParameterJsonFile | ConvertFrom-Json)

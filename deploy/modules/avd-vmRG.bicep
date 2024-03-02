@@ -17,6 +17,13 @@ param deploymentNameStructure string = '{rtype}-${utcNow()}'
 param tags object = {}
 param vmCount int = 1
 
+@secure()
+param sessionHostLocalUsername string
+@secure()
+param sessionHostLocalPassword string
+
+param vmOnlyTags object
+
 var vmResourceGroupName = empty(overrideVmResourceGroupName) ? replace(namingStructure, '{rtype}', abbreviations['Resource Group']) : overrideVmResourceGroupName
 
 // If needed, create a separate resource group for the VMs
@@ -48,5 +55,10 @@ module avdVm 'avd-vm.bicep' = {
     avdVmHostNameStructure: avdVmHostNameStructure
     hostPoolName: hostPoolName
     avdSubnetId: avdSubnetId
+
+    vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: sessionHostLocalUsername
+    sessionHostLocalPassword: sessionHostLocalPassword
   }
 }

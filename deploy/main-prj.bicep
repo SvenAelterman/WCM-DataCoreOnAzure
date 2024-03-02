@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 @allowed([
-  'eastus2'
+  'westus'
   'eastus'
 ])
 param location string
@@ -32,13 +32,9 @@ param hubWorkloadName string
 @maxLength(10)
 param shortHubWorkloadName string = take(replace(replace(replace(replace(replace(hubWorkloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
 
-// LATER: Deploy research VM in this spoke if true
-#disable-next-line no-unused-params
-param deployResearchVm bool = false
-
 param avdVmHostNameStructure string = 'vm-${shortWorkloadName}${sequence}'
 
-// TODO: Rename AAD to EntraId
+// LATER: Rename AAD to EntraId
 @description('The Entra ID Object ID of the Data Core Sysadmins group. Members of this group will have Administrator acccess to the airlock VMs.')
 param aadSysAdminGroupObjectId string
 
@@ -50,6 +46,15 @@ param hubSequence int = 1
 param namingConvention string = '{rtype}-{wloadname}-{subwloadname}-{env}-{loc}-{seq}'
 param hubNamingConvention string = namingConvention
 param deploymentTime string = utcNow()
+
+param azureBastionSubnetAddressPrefix string = '255.255.255.255/32'
+
+@secure()
+param vmLocalUsername string
+@secure()
+param vmLocalPassword string
+
+param vmOnlyTags object = {}
 
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
@@ -74,8 +79,10 @@ var subWorkloadNames = {
 // LATER: Storage account names should use short naming convention
 var shortCoreNamingConvention = replace(namingConvention, '{subwloadname}', take(subWorkloadNames.core, 1))
 
+var regionNameMap = loadJsonContent('content/regionNameMap.jsonc')
+
 // Naming structure only needs the resource type ({rtype}) replaced
-var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var thisNamingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.core)
 var dataNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.data)
 var computeNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkloadNames.compute)
@@ -83,8 +90,8 @@ var avdNamingStructure = replace(thisNamingStructure, '{subwloadname}', subWorkl
 
 // Names of hub resources [The hub is deployed from main-hub.bicep before deploying project resources.]
 var hubSequenceFormatted = format('{0:00}', hubSequence)
-var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
-var hubAirlockNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'airlock')
+var hubCoreNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'core')
+var hubAirlockNamingStructure = replace(replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', hubSequenceFormatted), '{wloadname}', hubWorkloadName), '{subwloadname}', 'airlock')
 var hubVNetName = replace(hubCoreNamingStructure, '{rtype}', 'vnet')
 var hubFwName = replace(hubCoreNamingStructure, '{rtype}', 'fw')
 
@@ -144,11 +151,6 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12
   scope: coreHubResourceGroup
 }
 
-resource hubVNet 'Microsoft.Network/virtualNetworks@2022-01-01' existing = {
-  name: hubVNetName
-  scope: coreHubResourceGroup
-}
-
 // The existing Private DNS zones for the storage account sub-resources
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2020-06-01' existing = [for subresource in storageAccountSubResourcePrivateEndpoints: {
   name: 'privatelink.${subresource}.${az.environment().suffixes.storage}'
@@ -171,7 +173,7 @@ module defaultNsg 'modules/nsg-prj.bicep' = {
   params: {
     location: location
     namingStructure: coreNamingStructure
-    avdSubnetRange: hubVNet.properties.subnets[1].properties.addressPrefix
+    bastionAddressPrefix: azureBastionSubnetAddressPrefix
   }
 }
 
@@ -316,7 +318,7 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
       containerNames.exportRequest
     ]
     subnetId: vNetModule.outputs.subnetIds[1]
-    tags: tags
+    tags: union(tags, { 'hidden-title': 'Private Storage Account' })
     // The list of file shares to create in this storage account
     fileShareNames: actualProjectFileShareNames
     privateEndpointInfo: peInfo
@@ -324,6 +326,17 @@ module privateStorageAccountModule 'modules/data/storage.bicep' = {
     // Use the module to assign permissions to the blob storage
     // LATER: Assign all permissions (ADF, individuals, group) in centrally instead of spread across modules
     principalIds: [ projectMemberAadGroupObjectId ]
+  }
+}
+
+// Grant the researchers Reader access to the storage account so it's listed in Storage Explorer
+module privateStorageAccountRbacModule 'common-modules/roleAssignments/roleAssignment-st.bicep' = {
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-rbac'), 64)
+  scope: dataPrjResourceGroup
+  params: {
+    storageAccountName: privateStorageAccountModule.outputs.storageAccountName
+    principalId: projectMemberAadGroupObjectId
+    roleDefinitionId: rolesModule.outputs.roles.Reader
   }
 }
 
@@ -366,7 +379,7 @@ var roles = rolesModule.outputs.roles
 // Key Vault is required for the data automation module.
 // First, create a name for the Key Vault
 module keyVaultShortNameModule 'common-modules/shortname.bicep' = {
-  name: 'keyVaultShortName'
+  name: take(replace(deploymentNameStructure, '{rtype}', 'kv-shortname'), 64)
   scope: corePrjResourceGroup
   params: {
     location: location
@@ -407,7 +420,7 @@ module privateStorageAccountConnStringSecretModule 'modules/keyVault-StorageAcco
 // Create air lock/drawbridge for data move (dataAutomationModule)
 // First, create a name for the public storage account which will be created by the dataAutomationModule
 module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
-  name: 'publicStorageAccountShortName'
+  name: take(replace(deploymentNameStructure, '{rtype}', 'st-pub-name'), 64)
   // The public storage account will be created in the data resource group
   // But where we generate the name doesn't matter
   scope: corePrjResourceGroup
@@ -422,9 +435,10 @@ module publicStorageAccountShortname 'common-modules/shortname.bicep' = {
   }
 }
 
+var hubAirlockResourceGroupName = replace(hubAirlockNamingStructure, '{rtype}', 'rg')
 // Reference the existing hub's airlock resource group
 resource airlockHubRg 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: replace(hubAirlockNamingStructure, '{rtype}', 'rg')
+  name: hubAirlockResourceGroupName
   scope: subscription(hubSubscriptionId)
 }
 
@@ -438,7 +452,7 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
     location: location
     namingConvention: replace(namingConvention, '{subwloadname}', take(subWorkloadNames.hubAirlock, 1))
     resourceType: 'st'
-    sequence: sequence
+    sequence: hubSequence
     workloadName: hubWorkloadName
     removeHyphens: true
   }
@@ -447,7 +461,7 @@ module airlockStorageAccountNameModule 'common-modules/shortname.bicep' = {
 // Get the name of the hub's Key Vault
 // LATER: Take as an input parameter instead
 module hubKeyVaultShortNameModule 'common-modules/shortname.bicep' = {
-  name: replace(deploymentNameStructure, '{rtype}', 'kv-shortname')
+  name: replace(deploymentNameStructure, '{rtype}', 'kv-hub-shortname')
   scope: coreHubResourceGroup
   params: {
     location: location
@@ -489,6 +503,8 @@ module dataAutomationModule 'modules/data.bicep' = {
     projectMemberAadGroupObjectId: projectMemberAadGroupObjectId
 
     fileShareNames: fileShareNames
+
+    airlockStorageAccountId: resourceId(hubSubscriptionId, hubAirlockResourceGroupName, 'Microsoft.Storage/storageAccounts', airlockStorageAccountNameModule.outputs.shortName)
   }
 }
 
@@ -566,6 +582,11 @@ module avdModule 'modules/avd.bicep' = {
     loginPermissionObjectId: projectMemberAadGroupObjectId
     dvuRoleDefinitionId: roles.DesktopVirtualizationUser
     virtualMachineUserLoginRoleDefinitionId: roles.VirtualMachineUserLogin
+
+    vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: vmLocalUsername
+    sessionHostLocalPassword: vmLocalPassword
   }
 }
 

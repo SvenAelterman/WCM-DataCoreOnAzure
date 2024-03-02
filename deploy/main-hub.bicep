@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 @allowed([
-  'eastus2'
+  'westus'
   'eastus'
 ])
 param location string
@@ -15,9 +15,6 @@ param workloadName string
 // Default the short workload name: remove all vowels
 @maxLength(10)
 param shortWorkloadName string = take(replace(replace(replace(replace(replace(workloadName, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', ''), 10)
-@secure()
-#disable-next-line no-unused-params
-param airlockVmLocalAdminPassword string // Keeping this unused parameter for future use with Key Vault secrets
 
 // Create private DNS zone with this name
 param computeDnsSuffix string
@@ -41,6 +38,15 @@ param deploymentTime string = utcNow()
 param airlockVmHostNameStructure string = 'al-${workloadName}-${sequence}'
 param deployBastionHost bool = true
 
+param vmOnlyTags object = {}
+
+@secure()
+param vmLocalUsername string
+@secure()
+param vmLocalPassword string
+
+var regionNameMap = loadJsonContent('content/regionNameMap.jsonc')
+
 // Variables
 var sequenceFormatted = format('{0:00}', sequence)
 var deploymentNameStructure = '${workloadName}-{rtype}-${deploymentTime}'
@@ -59,7 +65,7 @@ var subWorkloadNames = {
 }
 
 // Naming structure only needs the resource type ({rtype}) replaced
-var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', location), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
+var namingStructure = replace(replace(replace(replace(namingConvention, '{env}', toLower(environment)), '{loc}', regionNameMap[location]), '{seq}', sequenceFormatted), '{wloadname}', workloadName)
 var coreNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.core)
 var avdNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.avd)
 var airlockNamingStructure = replace(namingStructure, '{subwloadname}', subWorkloadNames.airlock)
@@ -95,6 +101,7 @@ resource airlockHubResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01'
   tags: tags
 }
 
+// TODO: Remove hardcoded GUID for role definition
 // Enable sysadmins to log on to all VMs in the subscription
 resource subscriptionLoginRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aadDataAdminGroupObjectId, subscription().id, '1c0163c0-47e6-4577-8991-ea5c82e286e4')
@@ -270,6 +277,11 @@ module hubAirlockAvdModule 'modules/avd.bicep' = {
     workloadName: subWorkloadNames.airlock
 
     workspaceFriendlyName: 'Data Core Airlock Access'
+
+    vmOnlyTags: vmOnlyTags
+
+    sessionHostLocalUsername: vmLocalUsername
+    sessionHostLocalPassword: vmLocalPassword
   }
 }
 

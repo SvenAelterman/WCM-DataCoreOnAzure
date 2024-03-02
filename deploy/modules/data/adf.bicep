@@ -376,8 +376,6 @@ resource adfPrivateStgRole 'Microsoft.Authorization/roleAssignments@2020-10-01-p
   }
 }
 
-// TODO: Grant the ADF the Key Vault Secrets User on the airlock Key Vault and the project Key Vault
-
 output principalId string = adf.identity.principalId
 output name string = adf.name
 // TODO: Rename output pipeline name

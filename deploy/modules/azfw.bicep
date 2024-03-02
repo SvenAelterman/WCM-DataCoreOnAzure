@@ -3,6 +3,8 @@ param fwManagementSubnetId string
 param location string
 param namingStructure string
 
+param firewallTier string = 'Basic'
+
 param tags object = {}
 
 // Create public IP for the Azure Firewall
@@ -19,6 +21,7 @@ resource firewallPublicIp 'Microsoft.Network/publicIPAddresses@2022-01-01' = {
   tags: tags
 }
 
+// LATER: Only required for Basic SKU
 resource firewallPublicIp2 'Microsoft.Network/publicIPAddresses@2022-01-01' = {
   name: replace(namingStructure, '{rtype}', 'pip-fw2')
   location: location
@@ -31,8 +34,6 @@ resource firewallPublicIp2 'Microsoft.Network/publicIPAddresses@2022-01-01' = {
   }
   tags: tags
 }
-
-param firewallTier string = 'Basic'
 
 // Create standard firewall policy
 resource firewallPolicy 'Microsoft.Network/firewallPolicies@2022-01-01' = {
@@ -70,6 +71,10 @@ var ruleCollectionGroups = {
   ResearchDataSources: {
     rules: loadJsonContent('../content/azFwPolRuleColls-ResearchDataSources.json')
     priority: 600
+  }
+  Custom: {
+    rules: loadJsonContent('../content/azFwPolRuleColls-Custom.jsonc')
+    priority: 200
   }
 }
 
